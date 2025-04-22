@@ -1,0 +1,15 @@
+# General
+__pycache__/
+*.pyc
+*.pyo
+
+# Node
+node_modules/
+.expo/
+.expo-shared/
+.env
+
+# Python
+Backend/models/*.pt
+Backend/models/*.pkl
+venv/
