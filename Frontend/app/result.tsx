@@ -38,27 +38,15 @@ export default function ResultScreen() {
             <Text style={styles.resultTitle}>Anthracnose Detection</Text>
             
             {severityText ? (
-              <>
-                <View style={styles.resultBox}>
-                  <Text style={styles.resultLabel}>Severity Level</Text>
-                  <Text style={[
-                    styles.resultValue, 
-                    { color: severityColors[severityText as keyof typeof severityColors][1] }
-                  ]}>
-                    {severityText}
-                  </Text>
-                </View>
-                
-                <View style={styles.adviceBox}>
-                  <Text style={styles.adviceTitle}>Recommended Action:</Text>
-                  <Text style={styles.adviceText}>
-                    {severityText === 'Healthy' && "No action needed. Continue regular monitoring."}
-                    {severityText === 'Mild' && "Monitor leaves closely. Consider removing affected leaves."}
-                    {severityText === 'Moderate' && "Prune affected areas and apply fungicide as preventative."}
-                    {severityText === 'Severe' && "Immediate action required. Prune heavily affected areas and apply fungicide treatment."}
-                  </Text>
-                </View>
-              </>
+              <View style={styles.resultBox}>
+                <Text style={styles.resultLabel}>Severity Level</Text>
+                <Text style={[
+                  styles.resultValue, 
+                  { color: severityColors[severityText as keyof typeof severityColors][1] }
+                ]}>
+                  {severityText}
+                </Text>
+              </View>
             ) : (
               <Text style={styles.errorText}>⚠️ No result found.</Text>
             )}
@@ -128,23 +116,6 @@ const styles = StyleSheet.create({
   resultValue: {
     fontSize: 36,
     fontWeight: 'bold',
-  },
-  adviceBox: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 25,
-  },
-  adviceTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#5d4037',
-    marginBottom: 8,
-  },
-  adviceText: {
-    fontSize: 15,
-    color: '#5d4037',
-    lineHeight: 22,
   },
   errorText: {
     fontSize: 18,
