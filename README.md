@@ -67,10 +67,11 @@ SuperMango is a mobile application that helps mango farmers detect the **risk an
 This project was developed as part of an undergraduate thesis by:
 
 - **Autonomoux** – BS Computer Science – FEU Tech
+  - Rami Abuarqoub
+  - John Waver Aguilar (lead developer)
+  - Kyle Robin Andaya
+  - Neero Cruz
   - Rolen Christoper Paradeza
-  - [Add other members here]
-
-Supervised by: *[Insert adviser’s name]*
 
 ---
 
