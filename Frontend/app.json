@@ -16,8 +16,11 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["CAMERA"],
-      "edgeToEdgeEnabled": true
+      "permissions": [
+        "CAMERA"
+      ],
+      "edgeToEdgeEnabled": true,
+      "package": "com.waver.SuperMango"
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +41,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cf6e223a-efca-4209-9d1b-682c7329ff72"
+      }
     }
   }
 }

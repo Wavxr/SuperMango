@@ -38,7 +38,7 @@ export default function CameraScreen() {
         name: 'leaf.jpg',
       } as any);
 
-      const response = await fetch('http://192.168.1.166:8000/predict-severity', {
+      const response = await fetch('http://192.168.68.78:8000/predict-severity', {
         method: 'POST',
         headers: {
           'Content-Type': 'multipart/form-data',
