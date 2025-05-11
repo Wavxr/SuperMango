@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 /* ------------------------------------------------------------------- */
 
 const MAX_PHOTOS  = 10;
-const ENDPOINT    = 'http://192.168.1.166:8000/predict-batch';
+const ENDPOINT    = 'http://192.168.1.166:8000/getPrescription';
 const OPEN_WEATHER_API_KEY = process.env.EXPO_PUBLIC_OWM_KEY ?? '';
 
 /* ------------------------------------------------------------------- */

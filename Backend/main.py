@@ -1,11 +1,9 @@
 from fastapi import FastAPI
-from routes import resnet, weather, prescription
+from routes import core
 
 app = FastAPI(title="SuperMango API")
 
-app.include_router(resnet.router)
-app.include_router(weather.router)
-app.include_router(prescription.router)
+app.include_router(core.router)
 
 @app.get("/")
 def root():

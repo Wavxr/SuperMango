@@ -69,8 +69,8 @@ def log_response_json(resp: Dict[str, Any]) -> None:
 # route                                                                 #
 # --------------------------------------------------------------------- #
 
-@router.post("/predict-batch")
-async def predict_batch(
+@router.post("/getPrescription")
+async def getPrescription(
     files:       List[UploadFile] = File(...),
     # weather + coords (sent as simple form fields)
     humidity:    float = Form(...),
