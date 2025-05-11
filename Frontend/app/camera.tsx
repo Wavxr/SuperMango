@@ -86,6 +86,7 @@ export default function CameraScreen() {
 
   /* ----------------------- submit to backend ------------------------ */
   const handleSubmit = async () => {
+    // need all 10 images
     if (!haveTen) {
       Alert.alert(`Need ${MAX_PHOTOS} photos`, 'Please add more images.');
       return;
@@ -93,23 +94,53 @@ export default function CameraScreen() {
 
     setLoading(true);
     try {
-      /* ──────── 1. get GPS ──────── */
+      /* ──────── 1. grab GPS ──────── */
       const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
       if (locStatus !== 'granted') throw new Error('Location permission denied');
       const { coords } = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = coords;
 
-      /* ──────── 2. fetch weather ── */
-      const wxUrl =
-        `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}` +
-        `&units=metric&appid=${OPEN_WEATHER_API_KEY}`;
+      /* ──────── 2. fetch weather ─── */
+      let humidity = 0,
+          temperature = 0,
+          wetness = 0;                     // mm rain (3 h) or precip
 
-      const wx = await fetch(wxUrl).then(r => r.json());
-      const humidity   = wx.main?.humidity ?? 0;
-      const temperature= wx.main?.temp ?? 0;
-      const wetness    = (wx.rain?.['3h'] ?? 0).toFixed(2); /* mm last 3 h */
+      try {
+        /* primary source – OpenWeatherMap */
+        if (!OPEN_WEATHER_API_KEY) throw new Error('OWM key not set');
+        const owmUrl =
+          `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}` +
+          `&units=metric&appid=${OPEN_WEATHER_API_KEY}`;
 
-      /* ──────── 3. build formdata ─ */
+        const owmRes = await fetch(owmUrl);
+        if (!owmRes.ok) throw new Error(`OWM HTTP ${owmRes.status}`);
+
+        const wx = await owmRes.json();
+        console.log('🌤️  OWM response →', wx);
+
+        humidity    = wx.main?.humidity ?? 0;
+        temperature = wx.main?.temp ?? 0;
+        wetness     = ((wx.rain?.['3h'] ?? 0) as number).toFixed(2);
+      } catch (owmErr) {
+        /* fallback – Open-Meteo (no API key) */
+        console.warn('⚠️  OWM failed – switching to Open-Meteo →', owmErr);
+
+        const omUrl =
+          `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
+          `&current=temperature_2m,relative_humidity_2m,precipitation&timezone=auto`;
+
+        const omRes = await fetch(omUrl);
+        if (!omRes.ok) throw new Error(`Open-Meteo HTTP ${omRes.status}`);
+
+        const om = await omRes.json();
+        console.log('🌤️  Open-Meteo response →', om);
+
+        humidity    = om.current?.relative_humidity_2m ?? 0;
+        temperature = om.current?.temperature_2m ?? 0;
+        wetness     = Number(om.current?.precipitation ?? 0).toFixed(2);
+      }
+
+      /* ──────── 3. build FormData ─── */
       const fd = new FormData();
       images.forEach((uri, i) => {
         const ext  = uri.split('.').pop()?.split('?')[0] ?? 'jpg';
@@ -117,18 +148,19 @@ export default function CameraScreen() {
         fd.append('files', { uri, name: `leaf_${i}.${ext}`, type: mime } as any);
       });
 
-      // append weather + coords
       fd.append('humidity',    String(humidity));
       fd.append('temperature', String(temperature));
       fd.append('wetness',     String(wetness));
       fd.append('lat',         String(latitude));
       fd.append('lon',         String(longitude));
 
-      /* ──────── 4. post ─────────── */
+      /* ──────── 4. POST to API ────── */
       const res = await fetch(ENDPOINT, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
+
+      /* ──────── 5. navigate to result */
       router.push({
         pathname: '/result',
         params: {
@@ -139,6 +171,7 @@ export default function CameraScreen() {
         },
       });
 
+      /* reset for next batch */
       setImages([]);
       setCameraKey(Math.random());
     } catch (err) {
@@ -148,6 +181,7 @@ export default function CameraScreen() {
       setLoading(false);
     }
   };
+
 
   /* --------------------------- UI guards ---------------------------- */
   if (!camPerm) return <View />;
