@@ -1,41 +1,42 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
+  StyleSheet as RNStyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
   StatusBar,
-  StyleSheet as RNStyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 /* ------------------------------------------------------------------- */
-/* constants                                                            */
+/* constants                                                           */
 /* ------------------------------------------------------------------- */
 
-const MAX_PHOTOS = 10;
-const ENDPOINT   = 'http://192.168.1.166:8000/predict-batch';
+const MAX_PHOTOS  = 10;
+const ENDPOINT    = 'http://192.168.1.166:8000/predict-batch';
+const OPEN_WEATHER_API_KEY = process.env.EXPO_PUBLIC_OWM_KEY ?? '';
 
 /* ------------------------------------------------------------------- */
-/* component                                                            */
+/* component                                                           */
 /* ------------------------------------------------------------------- */
 export default function CameraScreen() {
-  const [cameraKey, setCameraKey] = useState(Math.random());
-  const cameraRef                 = useRef<any>(null);
-  const [facing]                  = useState<CameraType>('back');
+  const [cameraKey, setCameraKey]         = useState(Math.random());
+  const cameraRef                         = useRef<any>(null);
+  const [facing]                          = useState<CameraType>('back');
 
-  const [camPerm, requestCamPerm] = useCameraPermissions();
-  const [mediaPerm, setMediaPerm] = useState<ImagePicker.PermissionStatus | null>(null);
+  const [camPerm, requestCamPerm]         = useCameraPermissions();
+  const [mediaPerm, setMediaPerm]         = useState<ImagePicker.PermissionStatus | null>(null);
 
-  const [images, setImages]       = useState<string[]>([]);
-  const [loading, setLoading]     = useState(false);
-  const router                    = useRouter();
+  const [images, setImages]               = useState<string[]>([]);
+  const [loading, setLoading]             = useState(false);
+  const router                            = useRouter();
 
   const haveTen = images.length === MAX_PHOTOS;
 
@@ -68,7 +69,7 @@ export default function CameraScreen() {
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // old enum (no crash)
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
         selectionLimit: MAX_PHOTOS - images.length,
         quality: 1,
@@ -86,11 +87,29 @@ export default function CameraScreen() {
   /* ----------------------- submit to backend ------------------------ */
   const handleSubmit = async () => {
     if (!haveTen) {
-      Alert.alert(`Need ${MAX_PHOTOS} photos`, 'Please add more images.'); return;
+      Alert.alert(`Need ${MAX_PHOTOS} photos`, 'Please add more images.');
+      return;
     }
 
     setLoading(true);
     try {
+      /* ──────── 1. get GPS ──────── */
+      const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+      if (locStatus !== 'granted') throw new Error('Location permission denied');
+      const { coords } = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = coords;
+
+      /* ──────── 2. fetch weather ── */
+      const wxUrl =
+        `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}` +
+        `&units=metric&appid=${OPEN_WEATHER_API_KEY}`;
+
+      const wx = await fetch(wxUrl).then(r => r.json());
+      const humidity   = wx.main?.humidity ?? 0;
+      const temperature= wx.main?.temp ?? 0;
+      const wetness    = (wx.rain?.['3h'] ?? 0).toFixed(2); /* mm last 3 h */
+
+      /* ──────── 3. build formdata ─ */
       const fd = new FormData();
       images.forEach((uri, i) => {
         const ext  = uri.split('.').pop()?.split('?')[0] ?? 'jpg';
@@ -98,13 +117,30 @@ export default function CameraScreen() {
         fd.append('files', { uri, name: `leaf_${i}.${ext}`, type: mime } as any);
       });
 
+      // append weather + coords
+      fd.append('humidity',    String(humidity));
+      fd.append('temperature', String(temperature));
+      fd.append('wetness',     String(wetness));
+      fd.append('lat',         String(latitude));
+      fd.append('lon',         String(longitude));
+
+      /* ──────── 4. post ─────────── */
       const res = await fetch(ENDPOINT, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const { overall_severity_index } = await res.json();
-      router.push({ pathname: '/result', params: { severity: String(overall_severity_index) } });
+      const data = await res.json();
+      router.push({
+        pathname: '/result',
+        params: {
+          severity:    String(data.overall_severity_index),
+          humidity:    String(data.weather.humidity),
+          temperature: String(data.weather.temperature),
+          wetness:     String(data.weather.wetness),
+        },
+      });
 
-      setImages([]);  setCameraKey(Math.random());
+      setImages([]);
+      setCameraKey(Math.random());
     } catch (err) {
       console.error('❌ Submission failed:', err);
       Alert.alert('Upload error', String(err));
@@ -198,7 +234,7 @@ function PermissionView({ title, message, onPress }: {
 
 /* ------------------------------- styles ----------------------------- */
 
-const styles = StyleSheet.create({
+const styles = RNStyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   overlay: {
     ...RNStyleSheet.absoluteFillObject,
