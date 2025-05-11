@@ -99,8 +99,16 @@ async def predict_batch(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
     overall_idx = round(severity_sum / len(predictions))
     overall_label = CLASS_LABELS[overall_idx]
 
-    response = {
+    # full object for developer logs
+    full_response = {
         "individual_predictions": predictions,
+        "percent_severity_index": psi,
+        "overall_label": overall_label,
+        "overall_severity_index": overall_idx,
+    }
+
+    # trimmed object sent back to the app
+    api_response = {
         "percent_severity_index": psi,
         "overall_label": overall_label,
         "overall_severity_index": overall_idx,
@@ -108,6 +116,6 @@ async def predict_batch(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
 
     # ------------- clean console output -------------------------------
     log_summary(predictions, psi, overall_label)
-    log_response_json(response)
+    log_response_json(api_response)
 
-    return response
+    return api_response     
