@@ -9,6 +9,7 @@ from fastapi import APIRouter, UploadFile, File, Form
 from typing import List, Dict, Any
 from PIL import Image
 from textwrap import indent
+from services.rule_service import get_recommendation
 import io
 import torch
 import torchvision.models as models
@@ -104,6 +105,14 @@ async def getPrescription(
     overall_idx   = round(severity_sum / len(predictions))
     overall_label = CLASS_LABELS[overall_idx]
 
+    # ------------- recommendation ----------------------------------------
+    recommendation = get_recommendation(
+        severity_idx = overall_idx,
+        humidity     = humidity,
+        temperature  = temperature,
+        wetness      = wetness,
+    )
+    
     # ------------- craft response -------------------------------------
     api_response = {
         "percent_severity_index": psi,
@@ -116,6 +125,7 @@ async def getPrescription(
             "lat":         lat,
             "lon":         lon,
         },
+        "recommendation": recommendation
         # "individual_predictions": predictions,  
     }
 
