@@ -162,10 +162,12 @@ export default function CameraScreen() {
       router.push({
         pathname: '/result',
         params: {
-          severity:    String(data.overall_severity_index),
-          humidity:    String(data.weather.humidity),
-          temperature: String(data.weather.temperature),
-          wetness:     String(data.weather.wetness),
+          psi:           String(data.percent_severity_index), 
+          overallLabel:  data.overall_label,                  
+          humidity:      String(data.weather.humidity),
+          temperature:   String(data.weather.temperature),
+          wetness:       String(data.weather.wetness),
+          recommendation: JSON.stringify(data.recommendation) 
         },
       });
 
