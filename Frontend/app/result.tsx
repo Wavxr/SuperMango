@@ -8,7 +8,7 @@ export default function ResultScreen() {
 
   const severityLabels = ['Healthy', 'Mild', 'Moderate', 'Severe'];
   const severityText = typeof severity === 'string' ? severityLabels[parseInt(severity)] : undefined;
-  
+
   // Colors for different severity levels
   const severityColors = {
     'Healthy': ['#81c784', '#4caf50'],
@@ -16,7 +16,7 @@ export default function ResultScreen() {
     'Moderate': ['#ffb74d', '#ff9800'],
     'Severe': ['#e57373', '#f44336']
   };
-  
+
   // Get colors based on severity or default to yellow theme
   const gradientColors = severityText ? 
     severityColors[severityText as keyof typeof severityColors] : 
@@ -39,7 +39,7 @@ export default function ResultScreen() {
             
             {severityText ? (
               <View style={styles.resultBox}>
-                <Text style={styles.resultLabel}>Severity Level</Text>
+                <Text style={styles.resultLabel}>Overall Tree Condition</Text>
                 <Text style={[
                   styles.resultValue, 
                   { color: severityColors[severityText as keyof typeof severityColors][1] }

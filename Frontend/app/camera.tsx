@@ -1,86 +1,114 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, StatusBar } from 'react-native';
+import { useState, useRef, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  StatusBar,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function CameraScreen() {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState<CameraType>('back');
-  const [isLoading, setIsLoading] = useState(false);
+  /* ------------------------------------------------------------------ */
+  /* state & refs                                                       */
+  /* ------------------------------------------------------------------ */
   const [cameraKey, setCameraKey] = useState(Math.random());
   const cameraRef = useRef<any>(null);
+  const [facing] = useState<CameraType>('back');
+
+  const [permission, requestPermission] = useCameraPermissions();
+  const [capturedImages, setCapturedImages] = useState<string[]>([]);
+
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  // Replace the useEffect with useFocusEffect
+  /* reset camera each time screen is focused */
   useFocusEffect(
     useCallback(() => {
-      // This will run when the screen comes into focus
       setCameraKey(Math.random());
-      
-      // No need to return a cleanup function as useFocusEffect handles this
     }, [])
   );
 
+  /* ------------------------------------------------------------------ */
+  /* capture a single photo                                             */
+  /* ------------------------------------------------------------------ */
   const handleCapture = async () => {
     if (!cameraRef.current) return;
 
     try {
-      setIsLoading(true);
       const photo = await cameraRef.current.takePictureAsync({ skipProcessing: true });
+      setCapturedImages(prev => [...prev, photo.uri]);
+    } catch (err) {
+      console.error('❌ Capture error:', err);
+    }
+  };
 
+  /* ------------------------------------------------------------------ */
+  /* submit ten photos                                                  */
+  /* ------------------------------------------------------------------ */
+  const handleSubmit = async () => {
+    if (capturedImages.length < 10) {
+      Alert.alert('Please take 10 leaf photos.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
       const formData = new FormData();
-      formData.append('file', {
-        uri: photo.uri,
-        type: 'image/jpeg',
-        name: 'leaf.jpg',
-      } as any);
 
-      const response = await fetch('http://192.168.68.78:8000/predict-severity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        body: formData,
+      capturedImages.forEach((uri, i) => {
+        const ext = uri.split('.').pop()?.split('?')[0] ?? 'jpg';
+        const mime = ext.toLowerCase() === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+
+        formData.append('files', {
+          uri,
+          name: `leaf_${i}.${ext}`,
+          type: mime,
+        } as any);
       });
 
-      const result = await response.json();
+      const res = await fetch('http://192.168.1.166:8000/predict-batch', {
+        method: 'POST',
+        body: formData, // do NOT set Content-Type manually
+      });
 
-      if (!response.ok) throw new Error(result.detail || 'Server error');
+      if (!res.ok) throw new Error(`Server responded ${res.status}`);
 
-      console.log('✅ Prediction result from backend:', result);
-
+      const result = await res.json();
       router.push({
         pathname: '/result',
-        params: { severity: result.severity.toString() },
+        params: { severity: String(result.overall_severity) },
       });
 
-    } catch (error: any) {
-      console.error('❌ Error during capture:', error);
-      Alert.alert('Error', error.message || 'Failed to send photo.');
+      /* clean-up */
+      setCapturedImages([]);
+      setCameraKey(Math.random());
+    } catch (err: any) {
+      console.error('❌ Submission failed:', err);
+      Alert.alert('Upload error', err.message ?? 'Failed to send photos.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  /* ------------------------------------------------------------------ */
+  /* UI                                                                 */
+  /* ------------------------------------------------------------------ */
   if (!permission) return <View />;
   if (!permission.granted) {
     return (
       <View style={styles.permissionContainer}>
-        <LinearGradient
-          colors={['#fff9c4', '#fff176', '#ffeb3b']}
-          style={styles.permissionGradient}
-        >
+        <LinearGradient colors={['#fff9c4', '#fff176', '#ffeb3b']} style={styles.permissionGradient}>
           <Text style={styles.permissionTitle}>Camera Access</Text>
           <Text style={styles.permissionMessage}>
             Camera permission is required to scan mango leaves for Anthracnose detection.
           </Text>
-          <TouchableOpacity 
-            style={styles.permissionButton} 
-            onPress={requestPermission}
-          >
+          <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
             <LinearGradient
               colors={['#fbc02d', '#f9a825']}
               start={{ x: 0, y: 0 }}
@@ -95,35 +123,47 @@ export default function CameraScreen() {
     );
   }
 
+  const haveTenPhotos = capturedImages.length === 10;
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       <CameraView key={cameraKey} style={styles.camera} facing={facing} ref={cameraRef} photo>
         <View style={styles.overlay}>
           <View style={styles.header}>
-            <Text style={styles.headerText}>Position Leaf in Frame</Text>
-          </View>
-          
-          <View style={styles.frameGuide}>
-            {/* Optional frame guide overlay */}
-          </View>
-          
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-              style={styles.captureButton} 
-              onPress={handleCapture} 
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" size="large" />
-              ) : (
-                <View style={styles.captureInner} />
-              )}
-            </TouchableOpacity>
-            
-            <Text style={styles.captureText}>
-              {isLoading ? 'Analyzing...' : 'Tap to Scan Leaf'}
+            <Text style={styles.headerText}>
+              {`Photos: ${capturedImages.length}/10 — ${haveTenPhotos ? 'Ready!' : 'Take more'}`}
             </Text>
+          </View>
+
+          <View style={styles.frameGuide} />
+
+          <View style={styles.buttonContainer}>
+            {!haveTenPhotos ? (
+              <TouchableOpacity
+                style={styles.captureButton}
+                onPress={handleCapture}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" size="large" />
+                ) : (
+                  <View style={styles.captureInner} />
+                )}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.captureButton}
+                onPress={handleSubmit}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" size="large" />
+                ) : (
+                  <Text style={{ color: '#fff' }}>Submit All Photos</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </CameraView>
@@ -131,14 +171,12 @@ export default function CameraScreen() {
   );
 }
 
+/* -------------------------------------------------------------------- */
+/* styles                                                               */
+/* -------------------------------------------------------------------- */
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#000' 
-  },
-  camera: { 
-    flex: 1 
-  },
+  container: { flex: 1, backgroundColor: '#000' },
+  camera: { flex: 1 },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.2)',
@@ -150,11 +188,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  headerText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
+  headerText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   frameGuide: {
     flex: 1,
     margin: 40,
@@ -185,14 +219,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-  captureText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  permissionContainer: {
-    flex: 1,
-  },
+  permissionContainer: { flex: 1 },
   permissionGradient: {
     flex: 1,
     justifyContent: 'center',
@@ -230,9 +257,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 30,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
+  buttonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
 });
