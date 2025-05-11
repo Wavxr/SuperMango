@@ -1,4 +1,5 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { useState, useRef, useCallback } from 'react';
 import {
   View,
@@ -13,80 +14,107 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+/* ------------------------------------------------------------------- */
+/* constants & helpers                                                 */
+/* ------------------------------------------------------------------- */
+
+const MAX_PHOTOS = 10;
+const ENDPOINT   = 'http://192.168.1.166:8000/predict-batch';
+
+/* ------------------------------------------------------------------- */
+/* component                                                           */
+/* ------------------------------------------------------------------- */
 export default function CameraScreen() {
-  /* ------------------------------------------------------------------ */
-  /* state & refs                                                       */
-  /* ------------------------------------------------------------------ */
-  const [cameraKey, setCameraKey] = useState(Math.random());
-  const cameraRef = useRef<any>(null);
-  const [facing] = useState<CameraType>('back');
+  /* --------------------------- state -------------------------------- */
+  const [cameraKey, setCameraKey]     = useState(Math.random());
+  const cameraRef                     = useRef<any>(null);
+  const [facing]                      = useState<CameraType>('back');
 
-  const [permission, requestPermission] = useCameraPermissions();
-  const [capturedImages, setCapturedImages] = useState<string[]>([]);
+  const [cameraPerm, requestCamPerm]  = useCameraPermissions();
+  const [mediaPerm,  setMediaPerm]    = useState<ImagePicker.PermissionStatus | null>(null);
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [images, setImages]           = useState<string[]>([]);
+  const [isLoading, setIsLoading]     = useState(false);
+
   const router = useRouter();
+  const haveTen = images.length === MAX_PHOTOS;
 
-  /* reset camera each time screen is focused */
+  /* reset camera key whenever screen regains focus */
   useFocusEffect(
     useCallback(() => {
       setCameraKey(Math.random());
     }, [])
   );
 
-  /* ------------------------------------------------------------------ */
-  /* capture a single photo                                             */
-  /* ------------------------------------------------------------------ */
+  /* ----------------------- capture from camera ---------------------- */
   const handleCapture = async () => {
-    if (!cameraRef.current) return;
-
+    if (!cameraRef.current || haveTen) return;
     try {
-      const photo = await cameraRef.current.takePictureAsync({ skipProcessing: true });
-      setCapturedImages(prev => [...prev, photo.uri]);
+      const { uri } = await cameraRef.current.takePictureAsync({ skipProcessing: true });
+      setImages(prev => [...prev, uri].slice(0, MAX_PHOTOS));
     } catch (err) {
       console.error('❌ Capture error:', err);
     }
   };
 
-  /* ------------------------------------------------------------------ */
-  /* submit ten photos                                                  */
-  /* ------------------------------------------------------------------ */
+  /* ----------------------- pick from gallery ------------------------ */
+  const handlePick = async () => {
+    if (haveTen) return;
+
+    /* request media permission once */
+    if (!mediaPerm) {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      setMediaPerm(status);
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Media-library permission is required to upload photos.');
+        return;
+      }
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 1,
+        selectionLimit: MAX_PHOTOS - images.length, // pick only what we still need
+      });
+
+      if (result.canceled) return;
+
+      const uris = result.assets.map(a => a.uri);
+      setImages(prev => [...prev, ...uris].slice(0, MAX_PHOTOS));
+    } catch (err) {
+      console.error('❌ Image-picker error:', err);
+    }
+  };
+
+  /* ----------------------- submit to backend ------------------------ */
   const handleSubmit = async () => {
-    if (capturedImages.length < 10) {
-      Alert.alert('Please take 10 leaf photos.');
+    if (!haveTen) {
+      Alert.alert(`Need ${MAX_PHOTOS} photos`, 'Please add more images.');
       return;
     }
 
     setIsLoading(true);
     try {
       const formData = new FormData();
-
-      capturedImages.forEach((uri, i) => {
-        const ext = uri.split('.').pop()?.split('?')[0] ?? 'jpg';
+      images.forEach((uri, i) => {
+        const ext  = uri.split('.').pop()?.split('?')[0] ?? 'jpg';
         const mime = ext.toLowerCase() === 'jpg' ? 'image/jpeg' : `image/${ext}`;
-
-        formData.append('files', {
-          uri,
-          name: `leaf_${i}.${ext}`,
-          type: mime,
-        } as any);
+        formData.append('files', { uri, name: `leaf_${i}.${ext}`, type: mime } as any);
       });
 
-      const res = await fetch('http://192.168.1.166:8000/predict-batch', {
-        method: 'POST',
-        body: formData, // do NOT set Content-Type manually
-      });
-
+      const res = await fetch(ENDPOINT, { method: 'POST', body: formData });
       if (!res.ok) throw new Error(`Server responded ${res.status}`);
 
-      const result = await res.json();
+      const { overall_severity_index } = await res.json();
       router.push({
         pathname: '/result',
-        params: { severity: String(result.overall_severity) },
+        params: { severity: String(overall_severity_index) },
       });
 
-      /* clean-up */
-      setCapturedImages([]);
+      /* reset for next scan */
+      setImages([]);
       setCameraKey(Math.random());
     } catch (err: any) {
       console.error('❌ Submission failed:', err);
@@ -96,73 +124,40 @@ export default function CameraScreen() {
     }
   };
 
-  /* ------------------------------------------------------------------ */
-  /* UI                                                                 */
-  /* ------------------------------------------------------------------ */
-  if (!permission) return <View />;
-  if (!permission.granted) {
+  /* --------------------------- UI logic ----------------------------- */
+  if (!cameraPerm) return <View />;            // still asking
+  if (!cameraPerm.granted) {
     return (
-      <View style={styles.permissionContainer}>
-        <LinearGradient colors={['#fff9c4', '#fff176', '#ffeb3b']} style={styles.permissionGradient}>
-          <Text style={styles.permissionTitle}>Camera Access</Text>
-          <Text style={styles.permissionMessage}>
-            Camera permission is required to scan mango leaves for Anthracnose detection.
-          </Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-            <LinearGradient
-              colors={['#fbc02d', '#f9a825']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.buttonText}>Grant Permission</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </LinearGradient>
-      </View>
+      <PermissionView
+        onPress={requestCamPerm}
+        title="Camera Access"
+        message="Camera permission is required to scan mango leaves for Anthracnose detection."
+      />
     );
   }
 
-  const haveTenPhotos = capturedImages.length === 10;
-
+  /* ----------------------------- JSX -------------------------------- */
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       <CameraView key={cameraKey} style={styles.camera} facing={facing} ref={cameraRef} photo>
         <View style={styles.overlay}>
+          {/* status bar */}
           <View style={styles.header}>
-            <Text style={styles.headerText}>
-              {`Photos: ${capturedImages.length}/10 — ${haveTenPhotos ? 'Ready!' : 'Take more'}`}
-            </Text>
+            <Text style={styles.headerText}>{`Photos: ${images.length}/${MAX_PHOTOS}`}</Text>
           </View>
 
           <View style={styles.frameGuide} />
 
+          {/* buttons */}
           <View style={styles.buttonContainer}>
-            {!haveTenPhotos ? (
-              <TouchableOpacity
-                style={styles.captureButton}
-                onPress={handleCapture}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" size="large" />
-                ) : (
-                  <View style={styles.captureInner} />
-                )}
-              </TouchableOpacity>
+            {haveTen ? (
+              <MainButton onPress={handleSubmit} loading={isLoading} label="Submit All (10)" />
             ) : (
-              <TouchableOpacity
-                style={styles.captureButton}
-                onPress={handleSubmit}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" size="large" />
-                ) : (
-                  <Text style={{ color: '#fff' }}>Submit All Photos</Text>
-                )}
-              </TouchableOpacity>
+              <>
+                <MainButton onPress={handleCapture} loading={isLoading} icon />
+                <MainButton onPress={handlePick}   loading={isLoading} label="Upload Photo(s)" />
+              </>
             )}
           </View>
         </View>
@@ -171,9 +166,67 @@ export default function CameraScreen() {
   );
 }
 
-/* -------------------------------------------------------------------- */
-/* styles                                                               */
-/* -------------------------------------------------------------------- */
+/* ------------------------------------------------------------------- */
+/* helper sub-components                                               */
+/* ------------------------------------------------------------------- */
+
+function MainButton({
+  onPress,
+  loading,
+  label,
+  icon,
+}: {
+  onPress: () => void;
+  loading: boolean;
+  label?: string;
+  icon?: boolean;
+}) {
+  return (
+    <TouchableOpacity style={styles.captureButton} onPress={onPress} disabled={loading}>
+      {loading ? (
+        <ActivityIndicator color="#fff" size="large" />
+      ) : icon ? (
+        <View style={styles.captureInner} /> /* camera shutter circle */
+      ) : (
+        <Text style={{ color: '#fff', textAlign: 'center' }}>{label}</Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+function PermissionView({
+  onPress,
+  title,
+  message,
+}: {
+  onPress: () => void;
+  title: string;
+  message: string;
+}) {
+  return (
+    <View style={styles.permissionContainer}>
+      <LinearGradient colors={['#fff9c4', '#fff176', '#ffeb3b']} style={styles.permissionGradient}>
+        <Text style={styles.permissionTitle}>{title}</Text>
+        <Text style={styles.permissionMessage}>{message}</Text>
+        <TouchableOpacity style={styles.permissionButton} onPress={onPress}>
+          <LinearGradient
+            colors={['#fbc02d', '#f9a825']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.buttonGradient}
+          >
+            <Text style={styles.buttonText}>Grant Permission</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </LinearGradient>
+    </View>
+  );
+}
+
+/* ------------------------------------------------------------------- */
+/* styles                                                              */
+/* ------------------------------------------------------------------- */
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
@@ -203,22 +256,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 150,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(255,255,255,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginVertical: 6,
   },
   captureInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#fbc02d',
     borderWidth: 2,
     borderColor: '#fff',
   },
+  /* permission screen */
   permissionContainer: { flex: 1 },
   permissionGradient: {
     flex: 1,
@@ -226,12 +280,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 30,
   },
-  permissionTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#795548',
-    marginBottom: 20,
-  },
+  permissionTitle: { fontSize: 28, fontWeight: 'bold', color: '#795548', marginBottom: 20 },
   permissionMessage: {
     fontSize: 16,
     color: '#5d4037',
@@ -248,12 +297,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(251, 192, 45, 0.3)',
   },
   buttonGradient: {
     paddingVertical: 16,
-    paddingHorizontal: 32,
     alignItems: 'center',
     borderRadius: 30,
   },

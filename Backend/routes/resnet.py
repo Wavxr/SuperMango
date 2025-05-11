@@ -1,53 +1,113 @@
+"""
+routes/resnet.py
+FastAPI route for batch severity prediction on mango-leaf images.
+"""
+
 from fastapi import APIRouter, UploadFile, File
-from typing import List
+from typing import List, Dict, Any
 from PIL import Image
+from textwrap import indent
 import io
 import torch
 import torchvision.models as models
-import torchvision.transforms as transforms
+import torchvision.transforms as T
+import json
 
+
+# --------------------------------------------------------------------- #
+# constants & helpers                                                   #
+# --------------------------------------------------------------------- #
+
+NUM_CLASSES         = 4
+CLASS_LABELS        = ["Healthy", "Mild", "Moderate", "Severe"]
+MAX_SEVERITY_SCORE  = NUM_CLASSES - 1          # 0-based classes → 3
+MODEL_PATH          = "models/resnet50_fold_3.pt"
+
+# single resize / tensor transform reused for every image
+TRANSFORM = T.Compose([
+    T.Resize((224, 224)),
+    T.ToTensor(),
+])
+
+def load_model() -> torch.nn.Module:
+    """Load a ResNet-50 and return it in eval mode on CPU."""
+    model = models.resnet50(weights=None)
+    model.fc = torch.nn.Linear(model.fc.in_features, NUM_CLASSES)
+
+    print(f"🔍 Loading model from: {MODEL_PATH}")
+    state_dict = torch.load(MODEL_PATH, map_location="cpu")
+    model.load_state_dict(state_dict)
+    model.eval()
+    print("✅ Model loaded and set to eval mode")
+    return model
+
+model = load_model()
 router = APIRouter()
 
-# Load model
-num_classes = 4
-model = models.resnet50(weights=None)
-num_ftrs = model.fc.in_features
-model.fc = torch.nn.Linear(num_ftrs, num_classes)
-model_path = "models/resnet50_fold_3.pt"
-print(f"🔍 Loading model from: {model_path}")
-state_dict = torch.load(model_path, map_location=torch.device("cpu"))
-model.load_state_dict(state_dict)
-model.eval()
-print("✅ Model loaded and set to eval mode")
+# --------------------------------------------------------------------- #
+# functions                                                             #
+# --------------------------------------------------------------------- #
+
+
+def log_image(idx: int, image: Image.Image) -> None:
+    """Pretty one-liner per image."""
+    w, h = image.size
+    print(f"🖼️  {idx:02d} | {w}×{h} | {image.mode}")
+
+def log_summary(preds: List[Dict[str, Any]], psi: float, overall: str) -> None:
+    """Aligned, easy-to-scan console output."""
+    print("\n────────── Batch summary ──────────")
+    for p in preds:
+        print(f" • {p['idx']:02d}  {p['label']:<8}  (class={p['severity']})")
+    print("───────────────────────────────────")
+    print(f" PSI: {psi:6.2f}%   Overall: {overall}")
+    print("───────────────────────────────────\n")
+
+def log_response_json(resp: Dict[str, Any]) -> None:
+    """Pretty-print the response dict."""
+    pretty = json.dumps(resp, indent=2, ensure_ascii=False)
+    print("📤 Response JSON ↓\n" + indent(pretty, "  ") + "\n")
+
+# --------------------------------------------------------------------- #
+# route                                                                 #
+# --------------------------------------------------------------------- #
 
 @router.post("/predict-batch")
-async def predict_batch(files: List[UploadFile] = File(...)):
-    print(f"📷 Received {len(files)} images")
+async def predict_batch(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
+    print(f"\n📷  Received {len(files)} image(s)")
 
-    predictions = []
+    predictions: List[Dict[str, Any]] = []
+    severity_sum = 0
+
+    # ------------- per-image inference --------------------------------
     for idx, file in enumerate(files):
-        contents = await file.read()
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
-        print(f"🖼 Image {idx} loaded with size: {image.size}, mode: {image.mode}")
+        img_bytes = await file.read()
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        log_image(idx, img)
 
-        transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-        ])
-        input_tensor = transform(image).unsqueeze(0)
+        input_tensor = TRANSFORM(img).unsqueeze(0)
 
         with torch.no_grad():
-            output = model(input_tensor)
-            severity = torch.argmax(output, dim=1).item()
-            predicted_label = ["Healthy", "Mild", "Moderate", "Severe"][severity]
+            severity = int(torch.argmax(model(input_tensor), dim=1).item())
+            label = CLASS_LABELS[severity]
 
-        predictions.append({"idx": idx, "severity": severity, "label": predicted_label})
+        predictions.append({"idx": idx, "severity": severity, "label": label})
+        severity_sum += severity
 
-    avg_severity = sum(p["severity"] for p in predictions) / len(predictions)
-    overall_label = ["Healthy", "Mild", "Moderate", "Severe"][int(avg_severity)]
+    # ------------- batch metrics --------------------------------------
+    psi = round(severity_sum / (MAX_SEVERITY_SCORE * len(predictions)) * 100, 2)
+    overall_idx = round(severity_sum / len(predictions))
+    overall_label = CLASS_LABELS[overall_idx]
 
-    return {
+    response = {
         "individual_predictions": predictions,
-        "overall_severity": int(avg_severity),
-        "overall_label": overall_label
+        "percent_severity_index": psi,
+        "overall_label": overall_label,
+        "overall_severity_index": overall_idx,
     }
+
+    # ------------- clean console output -------------------------------
+    log_summary(predictions, psi, overall_label)
+    log_response_json(response)
+
+    return response
