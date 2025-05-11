@@ -116,7 +116,6 @@ export default function CameraScreen() {
         if (!owmRes.ok) throw new Error(`OWM HTTP ${owmRes.status}`);
 
         const wx = await owmRes.json();
-        console.log('🌤️  OWM response →', wx);
 
         humidity    = wx.main?.humidity ?? 0;
         temperature = wx.main?.temp ?? 0;
@@ -133,7 +132,6 @@ export default function CameraScreen() {
         if (!omRes.ok) throw new Error(`Open-Meteo HTTP ${omRes.status}`);
 
         const om = await omRes.json();
-        console.log('🌤️  Open-Meteo response →', om);
 
         humidity    = om.current?.relative_humidity_2m ?? 0;
         temperature = om.current?.temperature_2m ?? 0;
