@@ -9,11 +9,14 @@ export default function Layout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          height: 70,
-          backgroundColor: Platform.OS === 'ios' ? 'transparent' : '#fff9c4',
+          height: 60, // Reduced from 70px to 60px
+          backgroundColor: Platform.OS === 'ios' ? 'transparent' : '#FFFFFF',
           borderTopWidth: 0,
-          elevation: 0,
-          shadowOpacity: 0,
+          elevation: 4, // Added subtle elevation for Android
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 3,
           position: 'absolute',
           bottom: 0,
         },
@@ -21,26 +24,26 @@ export default function Layout() {
           Platform.OS === 'ios' ? (
             <BlurView 
               tint="light" 
-              intensity={80} 
+              intensity={95} // Increased blur intensity for a more modern look
               style={{ 
                 position: 'absolute', 
                 top: 0, 
                 left: 0, 
                 right: 0, 
                 bottom: 0,
-                backgroundColor: 'rgba(255, 249, 196, 0.7)' 
+                backgroundColor: 'rgba(255, 255, 255, 0.8)' // Changed to white with transparency
               }} 
             />
           ) : null,
-        tabBarActiveTintColor: '#f9a825',
-        tabBarInactiveTintColor: '#795548',
+        tabBarActiveTintColor: '#4CAF50', // Changed to a green color to match the app theme
+        tabBarInactiveTintColor: '#9E9E9E', // Changed to a neutral gray
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11, // Reduced font size
           fontWeight: '500',
-          marginBottom: 8,
+          marginBottom: 5, // Reduced margin
         },
         tabBarIconStyle: {
-          marginTop: 8,
+          marginTop: 5, // Reduced margin
         }
       }}
     >
