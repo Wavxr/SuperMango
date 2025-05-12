@@ -11,8 +11,8 @@ import {
   Image,
   Dimensions,
   Animated,
+  Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 /* -------------------------------------------------------------------------
@@ -79,16 +79,15 @@ export default function ResultScreen() {
 
   /* ──────────────────────── colour palettes ───────────────────────────── */
   const severityColors = {
-    Healthy:  ['#A8E063', '#56AB2F'],
-    Mild:     ['#FFEDA3', '#FFC85C'],
-    Moderate: ['#FFB36B', '#FF914D'],
-    Severe:   ['#FF616D', '#FF1E42'],
+    Healthy:  '#4CAF50',
+    Mild:     '#FFC107',
+    Moderate: '#FF9800',
+    Severe:   '#F44336',
   } as const;
 
-  const gradientColors =
-    severityText && severityColors[severityText as keyof typeof severityColors]
-      ? severityColors[severityText as keyof typeof severityColors]
-      : ['#fff9c4', '#ffeb3b'];
+  const severityColor = severityText 
+    ? severityColors[severityText as keyof typeof severityColors] 
+    : '#4CAF50';
 
   /* ───────────────────────── handlers ─────────────────────────────────── */
   const scanAgain = () => router.replace('/');
@@ -98,12 +97,7 @@ export default function ResultScreen() {
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" />
-      <LinearGradient 
-        colors={gradientColors} 
-        style={styles.background}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-      >
+      <View style={[styles.background, { backgroundColor: '#f5f5f5' }]}>
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           {!showRec ? (
             /* ░░ FIRST SCREEN ░░ (Result) ░░──────────────────────────────── */
@@ -128,26 +122,27 @@ export default function ResultScreen() {
               <View style={styles.resultSection}>
                 {/* PSI progress bar */}
                 {typeof percentSeverity === 'number' && !Number.isNaN(percentSeverity) && (
-                  <View style={styles.psiContainer}>
-                    <View style={styles.progressTrack}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          {
-                            width: `${Math.min(percentSeverity, 100)}%`,
-                            backgroundColor:
-                              severityColors[severityText as keyof typeof severityColors][1],
-                          },
-                        ]}
-                      />
+                  <SimpleCard>
+                    <View style={styles.psiContainer}>
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            {
+                              width: `${Math.min(percentSeverity, 100)}%`,
+                              backgroundColor: severityColor,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <View style={styles.psiTextContainer}>
+                        <Text style={styles.psiLabel}>Percent Severity Index</Text>
+                        <Text style={styles.psiValue}>
+                          {percentSeverity.toFixed(1)}%
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.psiTextContainer}>
-                      <Text style={styles.psiLabel}>Percent Severity Index</Text>
-                      <Text style={styles.psiValue}>
-                        {percentSeverity.toFixed(1)}%
-                      </Text>
-                    </View>
-                  </View>
+                  </SimpleCard>
                 )}
 
                 {/* overall label */}
@@ -157,7 +152,7 @@ export default function ResultScreen() {
                     <Text
                       style={[
                         styles.conditionValue,
-                        { color: severityColors[severityText as keyof typeof severityColors][1] },
+                        { color: severityColor },
                       ]}
                     >
                       {severityText}
@@ -174,7 +169,7 @@ export default function ResultScreen() {
                     <WeatherItem
                       icon="thermometer-outline"
                       value={`${Number(temperature).toFixed(1)}°C`}
-                      label="Temperature"
+                      label="Temp"
                     />
                     <WeatherItem
                       icon="water-outline"
@@ -194,7 +189,6 @@ export default function ResultScreen() {
                 {rec && (
                   <PrimaryButton text="View Recommendation" onPress={toggleRec} />
                 )}
-                <SecondaryButton text="Scan Another Leaf" onPress={scanAgain} />
               </View>
             </ScrollView>
           ) : (
@@ -204,7 +198,7 @@ export default function ResultScreen() {
               showsVerticalScrollIndicator={false}
             >
               <TouchableOpacity style={styles.backButton} onPress={toggleRec}>
-                <Ionicons name="arrow-back" size={22} color="#795548" />
+                <Ionicons name="arrow-back" size={22} color="#424242" />
                 <Text style={styles.backText}>Back to Results</Text>
               </TouchableOpacity>
 
@@ -242,20 +236,24 @@ export default function ResultScreen() {
               {rec ? (
                 <View style={styles.adviceSection}>
                   <Text style={styles.sectionTitle}>What to Do</Text>
-                  <View style={styles.adviceContainer}>
-                    {rec.advice.split('\n').map((line, i) => (
-                      <View key={i} style={styles.adviceRow}>
-                        <View style={styles.bulletPoint} />
-                        <Text style={styles.adviceText}>{line}</Text>
-                      </View>
-                    ))}
-                  </View>
+                  <SimpleCard>
+                    <View style={styles.adviceContainer}>
+                      {rec.advice.split('\n').map((line, i) => (
+                        <View key={i} style={styles.adviceRow}>
+                          <View style={styles.bulletPoint} />
+                          <Text style={styles.adviceText}>{line}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </SimpleCard>
 
                   {rec.info ? (
-                    <View style={styles.infoContainer}>
-                      <Text style={styles.infoTitle}>Why it Works</Text>
-                      <Text style={styles.infoText}>{rec.info}</Text>
-                    </View>
+                    <SimpleCard style={{ marginTop: 0 }}>
+                      <View style={styles.infoContainer}>
+                        <Text style={styles.infoTitle}>Why it Works</Text>
+                        <Text style={styles.infoText}>{rec.info}</Text>
+                      </View>
+                    </SimpleCard>
                   ) : null}
                 </View>
               ) : (
@@ -268,12 +266,20 @@ export default function ResultScreen() {
             </ScrollView>
           )}
         </Animated.View>
-      </LinearGradient>
+      </View>
     </View>
   );
 }
 
 /* ─────────────────────────── helpers ──────────────────────────────────── */
+function SimpleCard({ children, style }: { children: React.ReactNode, style?: any }) {
+  return (
+    <View style={[styles.simpleCard, style]}>
+      {children}
+    </View>
+  );
+}
+
 function WeatherItem({
   icon,
   value,
@@ -284,11 +290,11 @@ function WeatherItem({
   label: string;
 }) {
   return (
-    <View style={styles.weatherItem}>
-      <Ionicons name={icon} size={24} color="#5d4037" />
+    <SimpleCard style={styles.weatherItem}>
+      <Ionicons name={icon} size={22} color="#424242" />
       <Text style={styles.weatherValue}>{value}</Text>
-      <Text style={styles.weatherLabel}>{label}</Text>
-    </View>
+      <Text style={styles.weatherLabel} numberOfLines={1}>{label}</Text>
+    </SimpleCard>
   );
 }
 
@@ -305,32 +311,9 @@ function PrimaryButton({
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <LinearGradient
-        colors={['#26a69a', '#009688']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.buttonGradient}
-      >
+      <View style={styles.buttonInner}>
         <Text style={styles.primaryButtonText}>{text}</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-}
-
-function SecondaryButton({
-  text,
-  onPress,
-}: {
-  text: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity 
-      style={styles.secondaryButton} 
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <Text style={styles.secondaryButtonText}>{text}</Text>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -346,49 +329,62 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingTop: 40,
+    paddingTop: 20, 
   },
   content: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingBottom: 0, 
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 10, 
     alignItems: 'center',
   },
   title: {
-    fontSize: 28,
+    fontSize: 20, 
     fontWeight: '700',
-    color: '#5d4037',
+    color: '#424242',
     textAlign: 'center',
   },
   imageWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 30,
+    marginBottom: 20, 
   },
   leaf: { 
     width: 180, 
-    height: 180, 
+    height: 180,
     resizeMode: 'contain',
   },
   resultSection: {
-    marginBottom: 30,
+    marginBottom: 20, 
+  },
+  simpleCard: {
+    borderRadius: 12, 
+    overflow: 'hidden',
+    marginBottom: 15,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   psiContainer: {
-    marginBottom: 25,
+    padding: 16, 
   },
   progressTrack: {
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    height: 8, 
+    borderRadius: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     overflow: 'hidden',
     marginBottom: 12,
   },
   progressFill: { 
     height: '100%', 
-    borderRadius: 6,
+    borderRadius: 4,
   },
   psiTextContainer: {
     flexDirection: 'row',
@@ -396,37 +392,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   psiLabel: { 
-    fontSize: 16, 
-    color: '#5d4037',
+    fontSize: 14,
+    color: '#424242',
     fontWeight: '500',
   },
   psiValue: {
-    fontSize: 20,
+    fontSize: 18, 
     fontWeight: '700',
-    color: '#5d4037',
+    color: '#424242',
   },
   conditionContainer: { 
-    marginTop: 20,
+    marginTop: 10,
     alignItems: 'center',
   },
   conditionLabel: { 
-    fontSize: 16, 
-    color: '#5d4037', 
-    marginBottom: 8,
+    fontSize: 14, 
+    color: '#424242', 
+    marginBottom: 6, 
     fontWeight: '500',
   },
   conditionValue: { 
-    fontSize: 36, 
+    fontSize: 32, 
     fontWeight: '700',
   },
   weatherSection: {
-    marginBottom: 30,
+    marginBottom: 20, 
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16, 
     fontWeight: '600',
-    color: '#5d4037',
-    marginBottom: 16,
+    color: '#424242',
+    marginBottom: 12, 
     textAlign: 'center',
   },
   weatherRow: {
@@ -435,141 +431,127 @@ const styles = StyleSheet.create({
   },
   weatherItem: {
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 16,
+    padding: 10, 
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 4,
   },
   weatherValue: { 
-    fontSize: 18, 
+    fontSize: 14, 
     fontWeight: '700', 
-    color: '#5d4037',
-    marginTop: 8,
+    color: '#424242',
+    marginTop: 4, 
   },
   weatherLabel: { 
-    fontSize: 14, 
-    color: '#795548', 
-    marginTop: 4,
+    fontSize: 11, 
+    color: '#757575', 
+    marginTop: 2,
+    textAlign: 'center',
   },
   actionSection: {
-    marginTop: 10,
+    marginTop: 0, 
+    marginBottom: 0, 
   },
   backButton: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    marginBottom: 20,
+    marginBottom: 15, 
     alignSelf: 'flex-start',
   },
   backText: { 
     marginLeft: 8, 
-    fontSize: 16, 
-    color: '#795548',
+    fontSize: 14,
+    color: '#424242',
     fontWeight: '500',
   },
   avatarWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 30,
+    marginBottom: 20, 
   },
   avatar: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 140, 
+    height: 140, 
+    borderRadius: 0,
   },
   riskSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 10,
   },
   riskBadge: { 
-    paddingHorizontal: 24, 
-    paddingVertical: 8, 
-    borderRadius: 20,
+    paddingHorizontal: 20, 
+    paddingVertical: 6, 
+    borderRadius: 16, 
   },
   riskText: { 
     color: '#fff', 
     fontWeight: '700', 
-    fontSize: 18,
+    fontSize: 12, 
   },
   adviceSection: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
   adviceContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    padding: 16, 
   },
   adviceRow: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 10, 
     alignItems: 'flex-start',
   },
   bulletPoint: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#5d4037',
+    width: 6, 
+    height: 6, 
+    borderRadius: 3,
+    backgroundColor: '#424242',
     marginTop: 6,
-    marginRight: 12,
+    marginRight: 10, 
   },
   adviceText: { 
     flex: 1,
-    fontSize: 16, 
-    color: '#5d4037', 
-    lineHeight: 22,
+    fontSize: 14,
+    color: '#424242', 
+    lineHeight: 20, 
   },
   infoContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 16,
-    padding: 20,
+    padding: 16,
   },
   infoTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#5d4037',
-    marginBottom: 8,
+    color: '#424242',
+    marginBottom: 0, 
   },
   infoText: {
-    fontSize: 15,
-    color: '#5d4037',
-    lineHeight: 22,
+    fontSize: 13, 
+    color: '#424242',
+    lineHeight: 18, 
     fontStyle: 'italic',
   },
   primaryButton: { 
     borderRadius: 12, 
     overflow: 'hidden',
     marginBottom: 16,
-    elevation: 2,
+    elevation: 1, 
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
   },
-  buttonGradient: { 
-    paddingVertical: 16, 
-    alignItems: 'center', 
+  buttonInner: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    alignItems: 'center',
   },
   primaryButtonText: { 
     color: '#fff', 
-    fontSize: 18, 
+    fontSize: 16, 
     fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  secondaryButtonText: { 
-    color: '#5d4037', 
-    fontSize: 18, 
-    fontWeight: '600',
+    textAlign: 'center',
   },
   error: { 
     textAlign: 'center', 
     color: '#f44336', 
     marginTop: 12,
-    fontSize: 16,
+    fontSize: 14, 
   },
 });
