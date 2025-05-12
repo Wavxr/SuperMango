@@ -7,17 +7,18 @@ type Recommendation = {
   severity_label: string;
   weather_risk: string;
   advice: string;
+  info: string;
 };
 
 export default function ResultScreen() {
   // --- params ------------------------------------------------------------------
   const {
-    psi,                // percent_severity_index (string | string[] | undefined)
-    overallLabel,       // overall_label         (string | undefined)
+    psi,                // percent_severity_index
+    overallLabel,       // overall_label
     humidity,
     temperature,
     wetness,
-    recommendation,     // JSON-stringified object
+    recommendation,     // JSON-stringified Recommendation
   } = useLocalSearchParams();
 
   const router = useRouter();
@@ -94,6 +95,7 @@ export default function ResultScreen() {
                 <Text style={styles.resultLabel}>📋 Recommendation</Text>
                 <Text style={styles.recommendationHeader}>Risk: {rec.weather_risk}</Text>
                 <Text style={styles.recommendationText}>{rec.advice}</Text>
+                {rec.info && <Text style={styles.infoText}>Why: {rec.info}</Text>}
               </View>
             ) : (
               <Text style={styles.errorText}>⚠️ No recommendation available.</Text>
@@ -147,6 +149,7 @@ const styles = StyleSheet.create({
   percentText: { fontSize: 32, fontWeight: '600', color: '#5d4037' },
   recommendationHeader: { fontSize: 18, fontWeight: '600', marginBottom: 6 },
   recommendationText: { fontSize: 16, textAlign: 'center', lineHeight: 22 },
+  infoText: { fontSize: 14, color: '#455a64', fontStyle: 'italic', textAlign: 'center', marginTop: 12, lineHeight: 20 },
   errorText: { fontSize: 16, color: '#f44336', textAlign: 'center', marginVertical: 10 },
   button: {
     width: '100%',
