@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+pillow
+torch==2.0.0
+torchvision==0.15.1
+scikit-learn
+requests
+numpy==1.24.4
