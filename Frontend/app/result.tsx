@@ -72,7 +72,12 @@ export default function ResultScreen() {
 
   const actionLabel = lang === 'tl' && rec.action_label_tagalog ? rec.action_label_tagalog : rec.action_label;
   const adviceText = lang === 'tl' && rec.advice_tagalog ? rec.advice_tagalog : rec.advice;
-  const infoText = lang === 'tl' && rec.info_tagalog ? rec.info_tagalog : rec.info;
+  const infoText =
+  lang === 'tl'
+    ? rec.info_tagalog || rec.info
+    : rec.info_tagalog
+    ? rec.info.replace(rec.info_tagalog, '').trim()
+    : rec.info;
 
   const colors = { Healthy: '#4CAF50', Mild: '#FFC107', Moderate: '#FF9800', Severe: '#F44336' };
   const severityColor = colors[severityText as keyof typeof colors] || '#424242';
