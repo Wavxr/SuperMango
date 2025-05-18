@@ -101,9 +101,28 @@ async def getPrescription(
         severity_sum += severity
 
     # ------------- batch metrics --------------------------------------
-    psi = round(severity_sum / (MAX_SEVERITY_SCORE * len(predictions)) * 100, 2)
-    overall_idx   = round(severity_sum / len(predictions))
-    overall_label = CLASS_LABELS[overall_idx]
+    estimated_area_by_class = {
+        0: 0,    # Healthy
+        1: 2,    # Mild: midpoint of 1–3%
+        2: 8,    # Moderate: midpoint of 4–12%
+        3: 15,   # Severe: baseline estimate (can go higher, but conservative)
+    }
+
+    # Compute PSI by summing estimated lesion % across leaves
+    total_psi = sum(estimated_area_by_class[p["severity"]] for p in predictions)
+    psi = round(total_psi / len(predictions), 2)  # PSI = avg lesion %
+
+    # Use RRL-based thresholds for label assignment
+    if psi == 0:
+        overall_label = "Healthy"
+    elif psi <= 3:
+        overall_label = "Mild"
+    elif psi <= 12:
+        overall_label = "Moderate"
+    else:
+        overall_label = "Severe"
+
+    overall_idx = CLASS_LABELS.index(overall_label)
 
     # ------------- recommendation ----------------------------------------
     recommendation = get_recommendation(

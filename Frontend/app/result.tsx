@@ -112,7 +112,7 @@ export default function ResultScreen() {
 
   // Modern UI color palette
   const theme = {
-    background: '#DDF6D2',
+    background : '#F5F7FA',
     card: '#FFFFFF',
     primary: '#4CAF50',
     text: '#2D3748',
@@ -190,7 +190,7 @@ export default function ResultScreen() {
                     </View>
                     <Text style={[styles.psiLabel, { color: severityColor }]}>
                       {percentSeverity.toFixed(1)}%{' '}
-                      {lang === 'tl' ? 'Nahawaan' : 'Infected'}
+                      {lang === 'tl' ? 'ang lala ng Anthracnose' : 'Severity of Anthracnose'}
                     </Text>
                   </View>
                 )}
