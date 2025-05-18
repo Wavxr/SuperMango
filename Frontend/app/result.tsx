@@ -1,4 +1,5 @@
-/* app/result.tsx ----------------------------------------------------------- */
+// app/result.tsx
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import {
@@ -15,41 +16,38 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-/* -------------------------------------------------------------------------
-   1.  STATIC IMPORT MAP  (← paths fixed)
----------------------------------------------------------------------------*/
-const leafImages = {
-  Healthy:  require('../assets/images/healthy.png'),
-  Mild:     require('../assets/images/mild.png'),
-  Moderate: require('../assets/images/moderate.png'),
-  Severe:   require('../assets/images/severe.png'),
-} as const;
+// Images
+import HealthyImg from '../assets/images/healthy.png';
+import MildImg from '../assets/images/mild.png';
+import ModerateImg from '../assets/images/moderate.png';
+import SevereImg from '../assets/images/severe.png';
+import AvatarImg from '../assets/images/avatar.png';
 
-const avatarImage = require('../assets/images/avatar.png');
-
-/* -------------------------------------------------------------------------
-   2.  TYPES
----------------------------------------------------------------------------*/
+// Types
 type Recommendation = {
   severity_label: string;
   weather_risk: 'Low' | 'Medium' | 'High';
+  action_label: string;
   advice: string;
   info: string;
+  action_label_tagalog?: string;
+  advice_tagalog?: string;
+  info_tagalog?: string;
 };
 
 export default function ResultScreen() {
-  /* ─────────────────────────── params ─────────────────────────────────── */
   const {
-    psi,                // percent_severity_index
-    overallLabel,       // overall_label
+    psi,
+    overallLabel,
     humidity,
     temperature,
     wetness,
-    recommendation,     // JSON-stringified Recommendation
+    recommendation,
   } = useLocalSearchParams();
 
   const router = useRouter();
   const [showRec, setShowRec] = useState(false);
+  const [lang, setLang] = useState<'en' | 'tl'>('en');
   const fadeAnim = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
@@ -58,500 +56,368 @@ export default function ResultScreen() {
       duration: 600,
       useNativeDriver: true,
     }).start();
-  }, [showRec]);
+  }, [showRec, lang]);
 
-  /* ─────────────────────────── parsing ────────────────────────────────── */
-  const severityText =
-    typeof overallLabel === 'string' ? overallLabel : undefined;
-  const percentSeverity = psi
-    ? parseFloat(Array.isArray(psi) ? psi[0] : (psi as string))
-    : undefined;
+  // Parse params
+  const percentSeverity = psi ? parseFloat(String(psi)) : undefined;
+  const severityText = String(overallLabel);
+  const rec: Recommendation = recommendation
+    ? JSON.parse(String(recommendation))
+    : { severity_label: '', weather_risk: 'Low', action_label: '', advice: '', info: '' };
 
-  let rec: Recommendation | undefined;
-  try {
-    rec =
-      typeof recommendation === 'string'
-        ? (JSON.parse(recommendation) as Recommendation)
-        : undefined;
-  } catch {
-    rec = undefined;
-  }
+  // Select text based on language
+  const actionLabel = lang === 'tl' && rec.action_label_tagalog ? rec.action_label_tagalog : rec.action_label;
+  const adviceText  = lang === 'tl' && rec.advice_tagalog        ? rec.advice_tagalog        : rec.advice;
+  const infoText    = lang === 'tl' && rec.info_tagalog          ? rec.info_tagalog          : rec.info;
 
-  /* ──────────────────────── colour palettes ───────────────────────────── */
-  const severityColors = {
-    Healthy:  '#4CAF50',
-    Mild:     '#FFC107',
-    Moderate: '#FF9800',
-    Severe:   '#F44336',
-  } as const;
+  // Colors
+  const colors = {
+    Healthy: '#4CAF50',
+    Mild:    '#FFC107',
+    Moderate:'#FF9800',
+    Severe:  '#F44336',
+  };
+  const severityColor = colors[severityText as keyof typeof colors] || '#424242';
 
-  const severityColor = severityText 
-    ? severityColors[severityText as keyof typeof severityColors] 
-    : '#4CAF50';
+  // Handlers
+  const toggleRec  = () => setShowRec(!showRec);
+  const scanAgain  = () => router.replace('/');
+  const toggleLang = () => setLang(prev => (prev === 'en' ? 'tl' : 'en'));
 
-  /* ───────────────────────── handlers ─────────────────────────────────── */
-  const scanAgain = () => router.replace('/');
-  const toggleRec = () => setShowRec(!showRec);
-
-  /* ====================================================================== */
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" />
-      <View style={[styles.background, { backgroundColor: '#f5f5f5' }]}>
-        <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-          {!showRec ? (
-            /* ░░ FIRST SCREEN ░░ (Result) ░░──────────────────────────────── */
-            <ScrollView 
-              contentContainerStyle={styles.content}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.header}>
-                <Text style={styles.title}>Anthracnose Detection</Text>
-              </View>
-
-              {/* leaf visual */}
-              {severityText && (
-                <View style={styles.imageWrapper}>
-                  <Image
-                    source={leafImages[severityText as keyof typeof leafImages]}
-                    style={styles.leaf}
-                  />
-                </View>
-              )}
-
-              <View style={styles.resultSection}>
-                {/* PSI progress bar */}
-                {typeof percentSeverity === 'number' && !Number.isNaN(percentSeverity) && (
-                  <SimpleCard>
-                    <View style={styles.psiContainer}>
-                      <View style={styles.progressTrack}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            {
-                              width: `${Math.min(percentSeverity, 100)}%`,
-                              backgroundColor: severityColor,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <View style={styles.psiTextContainer}>
-                        <Text style={styles.psiLabel}>Percent Severity Index</Text>
-                        <Text style={styles.psiValue}>
-                          {percentSeverity.toFixed(1)}%
-                        </Text>
-                      </View>
-                    </View>
-                  </SimpleCard>
-                )}
-
-                {/* overall label */}
-                {severityText && (
-                  <View style={styles.conditionContainer}>
-                    <Text style={styles.conditionLabel}>Tree Condition</Text>
-                    <Text
-                      style={[
-                        styles.conditionValue,
-                        { color: severityColor },
-                      ]}
-                    >
-                      {severityText}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* weather */}
-              {humidity && temperature && wetness && (
-                <View style={styles.weatherSection}>
-                  <Text style={styles.sectionTitle}>On-site Weather</Text>
-                  <View style={styles.weatherRow}>
-                    <WeatherItem
-                      icon="thermometer-outline"
-                      value={`${Number(temperature).toFixed(1)}°C`}
-                      label="Temp"
-                    />
-                    <WeatherItem
-                      icon="water-outline"
-                      value={`${Number(humidity).toFixed(0)}%`}
-                      label="Humidity"
-                    />
-                    <WeatherItem
-                      icon="rainy-outline"
-                      value={`${Number(wetness).toFixed(1)}h`}
-                      label="Wetness"
-                    />
-                  </View>
-                </View>
-              )}
-
-              <View style={styles.actionSection}>
-                {rec && (
-                  <PrimaryButton text="View Recommendation" onPress={toggleRec} />
-                )}
-              </View>
-            </ScrollView>
-          ) : (
-            /* ░░ SECOND SCREEN ░░ (Recommendation) ░░────────────────────── */
-            <ScrollView 
-              contentContainerStyle={styles.content}
-              showsVerticalScrollIndicator={false}
-            >
-              <TouchableOpacity style={styles.backButton} onPress={toggleRec}>
-                <Ionicons name="arrow-back" size={22} color="#424242" />
-                <Text style={styles.backText}>Back to Results</Text>
+      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+        {!showRec ? (
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>Anthracnose Results</Text>
+              <TouchableOpacity onPress={toggleLang} style={styles.langButton}>
+                <Text style={styles.langButtonText}>
+                  {lang === 'en' ? 'Tagalog' : 'English'}
+                </Text>
               </TouchableOpacity>
+            </View>
 
-              <View style={styles.header}>
-                <Text style={styles.title}>Treatment Recommendation</Text>
-              </View>
+            {/* SUMMARY CARD */}
+            <View style={[styles.summaryCard, { borderColor: severityColor }]}>
+              <Text style={styles.summaryText}>
+                {lang === 'tl' ? 'Kalubhaan:' : 'Severity:'}{' '}
+                <Text style={{ color: severityColor }}>{severityText}</Text>
+              </Text>
+              <Text style={styles.summaryText}>
+                {lang === 'tl' ? 'Panganib ng Panahon:' : 'Weather Risk:'}{' '}
+                <Text style={{
+                  color:
+                    rec.weather_risk === 'Low' ? '#81c784' :
+                    rec.weather_risk === 'Medium' ? '#ffb74d' : '#e57373'
+                }}>
+                  {rec.weather_risk}
+                </Text>
+              </Text>
+              <Text style={styles.summaryText}>
+                {lang === 'tl' ? 'Gagawin:' : 'Action:'}{' '}
+                <Text style={{ color: severityColor, fontWeight: '600' }}>
+                  {actionLabel}
+                </Text>
+              </Text>
+            </View>
 
-              <View style={styles.avatarWrapper}>
-                <Image source={avatarImage} style={styles.avatar} />
-              </View>
+            {/* LEAF IMAGE */}
+            <View style={styles.imageWrapper}>
+              <Image
+                source={
+                  severityText === 'Healthy'  ? HealthyImg :
+                  severityText === 'Mild'     ? MildImg :
+                  severityText === 'Moderate' ? ModerateImg :
+                                                SevereImg
+                }
+                style={styles.leaf}
+              />
+            </View>
 
-              {/* risk badge */}
-              {rec && (
-                <View style={styles.riskSection}>
-                  <Text style={styles.sectionTitle}>Risk Level</Text>
+            {/* PSI BAR */}
+            {typeof percentSeverity === 'number' && !Number.isNaN(percentSeverity) && (
+              <View style={styles.card}>
+                <View style={styles.progressTrack}>
                   <View
                     style={[
-                      styles.riskBadge,
+                      styles.progressFill,
                       {
-                        backgroundColor:
-                          rec.weather_risk === 'Low'
-                            ? '#81c784'
-                            : rec.weather_risk === 'Medium'
-                            ? '#ffb74d'
-                            : '#e57373',
+                        width: `${Math.min(percentSeverity, 100)}%`,
+                        backgroundColor: severityColor,
                       },
                     ]}
-                  >
-                    <Text style={styles.riskText}>{rec.weather_risk}</Text>
-                  </View>
+                  />
                 </View>
-              )}
-
-              {/* advice */}
-              {rec ? (
-                <View style={styles.adviceSection}>
-                  <Text style={styles.sectionTitle}>What to Do</Text>
-                  <SimpleCard>
-                    <View style={styles.adviceContainer}>
-                      {rec.advice.split('\n').map((line, i) => (
-                        <View key={i} style={styles.adviceRow}>
-                          <View style={styles.bulletPoint} />
-                          <Text style={styles.adviceText}>{line}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </SimpleCard>
-
-                  {rec.info ? (
-                    <SimpleCard style={{ marginTop: 0 }}>
-                      <View style={styles.infoContainer}>
-                        <Text style={styles.infoTitle}>Why it Works</Text>
-                        <Text style={styles.infoText}>{rec.info}</Text>
-                      </View>
-                    </SimpleCard>
-                  ) : null}
-                </View>
-              ) : (
-                <Text style={styles.error}>⚠️ No recommendation available.</Text>
-              )}
-
-              <View style={styles.actionSection}>
-                <PrimaryButton text="Scan Another Leaf" onPress={scanAgain} />
+                <Text style={styles.psiLabel}>{percentSeverity.toFixed(1)}% PSI</Text>
               </View>
-            </ScrollView>
-          )}
-        </Animated.View>
-      </View>
+            )}
+
+            {/* WEATHER STATS */}
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>
+                {lang === 'tl' ? 'Panahon' : 'Weather'}
+              </Text>
+              <View style={styles.statsRow}>
+                <Text style={styles.statItem}>🌡 {Number(temperature).toFixed(1)}°C</Text>
+                <Text style={styles.statItem}>💧 {Number(humidity).toFixed(0)}%</Text>
+                <Text style={styles.statItem}>☔ {Number(wetness).toFixed(1)}h</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.button} onPress={toggleRec} activeOpacity={0.8}>
+              <Text style={styles.buttonText}>
+                {lang === 'tl' ? 'Tingnan ang Payo' : 'View Recommendations'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        ) : (
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <View style={styles.headerRow}>
+              <TouchableOpacity style={styles.backButton} onPress={toggleRec}>
+                <Ionicons name="arrow-back" size={20} color="#424242" />
+                <Text style={styles.backText}>
+                  {lang === 'tl' ? 'Bumalik' : 'Back'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleLang} style={styles.langButton}>
+                <Text style={styles.langButtonText}>
+                  {lang === 'en' ? 'Tagalog' : 'English'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.title}>
+              {lang === 'tl' ? 'Mga Payo' : 'Recommendations'}
+            </Text>
+            <Image source={AvatarImg} style={styles.avatar} />
+
+            <View
+              style={[
+                styles.riskBadge,
+                {
+                  backgroundColor:
+                    rec.weather_risk === 'Low' ? '#81c784' :
+                    rec.weather_risk === 'Medium' ? '#ffb74d' : '#e57373'
+                },
+              ]}
+            >
+              <Text style={styles.riskText}>
+                {rec.weather_risk}{' '}
+                {lang === 'tl' ? 'Panganib' : 'Risk'}
+              </Text>
+            </View>
+
+            <View style={styles.card}>
+              {adviceText.split('\n').map((line, i) => (
+                <View key={i} style={styles.adviceRow}>
+                  <Text style={styles.bullet}>{i + 1}</Text>
+                  <Text style={styles.adviceText}>
+                    {line.replace(/^\d+\.\s*/, '')}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>
+                {lang === 'tl' ? 'Bakit' : 'Why'}
+              </Text>
+              <Text style={styles.infoText}>{infoText}</Text>
+            </View>
+
+            <TouchableOpacity style={styles.button} onPress={scanAgain} activeOpacity={0.8}>
+              <Text style={styles.buttonText}>
+                {lang === 'tl' ? 'Muli Scan' : 'Scan Again'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
+      </Animated.View>
     </View>
   );
 }
 
-/* ─────────────────────────── helpers ──────────────────────────────────── */
-function SimpleCard({ children, style }: { children: React.ReactNode, style?: any }) {
-  return (
-    <View style={[styles.simpleCard, style]}>
-      {children}
-    </View>
-  );
-}
-
-function WeatherItem({
-  icon,
-  value,
-  label,
-}: {
-  icon: any;
-  value: string;
-  label: string;
-}) {
-  return (
-    <SimpleCard style={styles.weatherItem}>
-      <Ionicons name={icon} size={22} color="#424242" />
-      <Text style={styles.weatherValue}>{value}</Text>
-      <Text style={styles.weatherLabel} numberOfLines={1}>{label}</Text>
-    </SimpleCard>
-  );
-}
-
-function PrimaryButton({
-  text,
-  onPress,
-}: {
-  text: string;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity 
-      style={styles.primaryButton} 
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <View style={styles.buttonInner}>
-        <Text style={styles.primaryButtonText}>{text}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-/* ─────────────────────────── styles ───────────────────────────────────── */
+// Styles
 const { width } = Dimensions.get('window');
 const styles = StyleSheet.create({
-  root: { 
+  root: {
     flex: 1,
-  },
-  background: { 
-    flex: 1,
+    backgroundColor: '#fff',
   },
   container: {
     flex: 1,
-    paddingTop: 20, 
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
   },
   content: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 0, 
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
-  header: {
-    marginBottom: 10, 
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
+  langButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  langButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   title: {
-    fontSize: 20, 
-    fontWeight: '700',
-    color: '#424242',
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#333',
     textAlign: 'center',
+    marginVertical: 16,
+    letterSpacing: 1,
+  },
+  summaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginVertical: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+  summaryText: {
+    fontSize: 16,
+    color: '#555',
+    marginBottom: 8,
   },
   imageWrapper: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20, 
+    marginVertical: 24,
   },
-  leaf: { 
-    width: 180, 
+  leaf: {
+    width: 180,
     height: 180,
     resizeMode: 'contain',
+    borderRadius: 12,
   },
-  resultSection: {
-    marginBottom: 20, 
-  },
-  simpleCard: {
-    borderRadius: 12, 
-    overflow: 'hidden',
-    marginBottom: 15,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    elevation: 1,
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginVertical: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
-  },
-  psiContainer: {
-    padding: 16, 
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
   progressTrack: {
-    height: 8, 
-    borderRadius: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#eee',
     overflow: 'hidden',
     marginBottom: 12,
   },
-  progressFill: { 
-    height: '100%', 
-    borderRadius: 4,
+  progressFill: {
+    height: '100%',
   },
-  psiTextContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  psiLabel: { 
-    fontSize: 14,
-    color: '#424242',
-    fontWeight: '500',
-  },
-  psiValue: {
-    fontSize: 18, 
-    fontWeight: '700',
-    color: '#424242',
-  },
-  conditionContainer: { 
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  conditionLabel: { 
-    fontSize: 14, 
-    color: '#424242', 
-    marginBottom: 6, 
-    fontWeight: '500',
-  },
-  conditionValue: { 
-    fontSize: 32, 
-    fontWeight: '700',
-  },
-  weatherSection: {
-    marginBottom: 20, 
+  psiLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
   },
   sectionTitle: {
-    fontSize: 16, 
-    fontWeight: '600',
-    color: '#424242',
-    marginBottom: 12, 
-    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+    color: '#333',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  weatherRow: {
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
   },
-  weatherItem: {
-    alignItems: 'center',
-    padding: 10, 
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  weatherValue: { 
-    fontSize: 14, 
-    fontWeight: '700', 
-    color: '#424242',
-    marginTop: 4, 
-  },
-  weatherLabel: { 
-    fontSize: 11, 
-    color: '#757575', 
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  actionSection: {
-    marginTop: 0, 
-    marginBottom: 0, 
-  },
-  backButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 15, 
-    alignSelf: 'flex-start',
-  },
-  backText: { 
-    marginLeft: 8, 
-    fontSize: 14,
-    color: '#424242',
+  statItem: {
+    fontSize: 15,
     fontWeight: '500',
+    color: '#555',
   },
-  avatarWrapper: {
+  button: {
+    backgroundColor: '#4CAF50',
+    padding: 16,
+    borderRadius: 24,
+    marginVertical: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20, 
+    shadowColor: '#4CAF50',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  backText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#555',
+    fontWeight: '600',
   },
   avatar: {
-    width: 140, 
-    height: 140, 
-    borderRadius: 0,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignSelf: 'center',
+    marginVertical: 24,
+    borderWidth: 2,
+    borderColor: '#eee',
   },
-  riskSection: {
-    alignItems: 'center',
-    marginBottom: 10,
+  riskBadge: {
+    alignSelf: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 16,
   },
-  riskBadge: { 
-    paddingHorizontal: 20, 
-    paddingVertical: 6, 
-    borderRadius: 16, 
-  },
-  riskText: { 
-    color: '#fff', 
-    fontWeight: '700', 
-    fontSize: 12, 
-  },
-  adviceSection: {
-    marginBottom: 20,
-  },
-  adviceContainer: {
-    padding: 16, 
+  riskText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
   adviceRow: {
     flexDirection: 'row',
-    marginBottom: 10, 
-    alignItems: 'flex-start',
+    marginBottom: 12,
   },
-  bulletPoint: {
-    width: 6, 
-    height: 6, 
-    borderRadius: 3,
-    backgroundColor: '#424242',
-    marginTop: 6,
-    marginRight: 10, 
+  bullet: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#555',
+    width: 24,
   },
-  adviceText: { 
+  adviceText: {
     flex: 1,
-    fontSize: 14,
-    color: '#424242', 
-    lineHeight: 20, 
-  },
-  infoContainer: {
-    padding: 16,
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#424242',
-    marginBottom: 0, 
+    fontSize: 15,
+    color: '#444',
+    lineHeight: 24,
   },
   infoText: {
-    fontSize: 13, 
-    color: '#424242',
-    lineHeight: 18, 
+    fontSize: 14,
     fontStyle: 'italic',
-  },
-  primaryButton: { 
-    borderRadius: 12, 
-    overflow: 'hidden',
-    marginBottom: 16,
-    elevation: 1, 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  buttonInner: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  primaryButtonText: { 
-    color: '#fff', 
-    fontSize: 16, 
-    fontWeight: '600',
+    color: '#666',
+    marginTop: 8,
     textAlign: 'center',
-  },
-  error: { 
-    textAlign: 'center', 
-    color: '#f44336', 
-    marginTop: 12,
-    fontSize: 14, 
   },
 });
