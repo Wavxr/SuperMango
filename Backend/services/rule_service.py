@@ -1,71 +1,16 @@
-"""
-SuperMango Rule-Based Prescription Engine
-=========================================
-get_recommendation(severity_idx, humidity, temperature, wetness) -> dict
-
-Returns
--------
-{
-    "severity_label": "Moderate",
-    "weather_risk"  : "High",
-    "advice"        : "1. ... 2. ...",
-    "info"          : "Why these steps work – background physiology / epidemiology."
-}
-
-How it works in simple terms
-----------------------------
-1.  **Severity label**  
-    Our vision model gives a number (0‒3).  
-    We translate it to a word: 0 = Healthy, 1 = Mild, 2 = Moderate, 3 = Severe.
-
-2.  **Weather risk**  
-    Anthracnose loves warm, humid, wet spells.  
-    • *High* if either  
-        – Classic textbook rule: 25–30 °C, ≥ 95 % RH, ≥ 12 h wetness, **or**  
-        – Farmer rule: 22–30 °C, ≥ 95 % RH, ≥ 6 h wetness (the “rain-then-sun” pattern).  
-    • *Low* if it’s cool, dry, or leaves dry quickly (< 6 h).  
-    • Everything in-between is *Medium*.
-
-3.  **Look up the prescription**  
-    We pair the severity with the risk and pull two short texts:  
-       – `advice` → a numbered to-do list  
-       – `info` → one line explaining the science behind the advice  
-    Those texts fold in lessons from the interviews (rotate fungicides, burn debris, seal pruning wounds, act within 24 h when risk is high, use organics first when pressure is low).
-
-4.  **Return a small JSON**  
-    The phone app pastes that JSON straight onto the screen or reads it aloud.
-
-That’s it—no fancy libraries, just a neat decision tree in Python.
-"""
-
-from typing import Dict
+from typing import Dict, Tuple
 
 # -------------------------------------------------------------- #
 # 0. CONSTANTS                                                   #
 # -------------------------------------------------------------- #
-
 CLASS_LABELS = ["Healthy", "Mild", "Moderate", "Severe"]
 
 # -------------------------------------------------------------- #
 # 1. WEATHER-RISK CLASSIFIER                                     #
 # -------------------------------------------------------------- #
 def _weather_risk(temp: float, rh: float, wet: float) -> str:
-    """
-    Decide whether today's weather creates Low, Medium, or High
-    risk for anthracnose.
-
-    High  →  (A) 25–30 °C, RH ≥ 95 %, wet ≥ 12 h
-          OR (B) 22–30 °C, RH ≥ 95 %, wet ≥ 6 h
-          (B) is the “rain-then-sun” spike farmers say wipes them out
-          in 24 h.
-
-    Low   →  temp < 22 °C  OR  RH < 85 %  OR  wet < 6 h
-
-    Medium → everything else.
-    """
     high_classic = 25 <= temp <= 30 and rh >= 95 and wet >= 12
     high_rainsun = 22 <= temp <= 30 and rh >= 95 and wet >= 6
-
     if high_classic or high_rainsun:
         return "High"
     if temp < 22 or rh < 85 or wet < 6:
@@ -73,89 +18,113 @@ def _weather_risk(temp: float, rh: float, wet: float) -> str:
     return "Medium"
 
 # -------------------------------------------------------------- #
-# 2. RULE & INFO MATRICES                                        #
+# 2. RULE, ACTION & INFO MATRICES                                #
 # -------------------------------------------------------------- #
-
-_RULE_MATRIX: Dict[tuple[str, str], str] = {
-    # --------------------------- LOW RISK --------------------------- #
+# Advice uses simple measures: tablespoons per 10-L bucket, teaspoons, etc.
+_RULE_MATRIX: Dict[Tuple[str, str], str] = {
+    # LOW RISK
     ("Healthy", "Low"): (
-        "1. Inspect a few trees every 5 days for new spots.\n"
-        "2. Prune crossing shoots so air flows freely.\n"
-        "3. Keep fertiliser balanced; avoid excess nitrogen."
+        "1. Every week, walk the orchard and pick up fallen leaves; *burn* them well away from trees.\n"
+        "2. Prune a few crowded branches to let air circulate.\n"
+        "3. If rain is coming, mix 2 level tablespoons of copper powder in one 10-L bucket of water; if sunny, mix 2 scoops (tablespoons) of water-dispersible copper powder.\n"
+        "4. Install a simple rain gauge or moisture sensors to spot wet patches before you see spots."
     ),
     ("Mild", "Low"): (
-        "1. Pluck leaves with lesions and discard them far from the block.\n"
-        "2. Disinfect pruning tools between trees.\n"
-        "3. Give one coat of *non-systemic* copper or mancozeb (2 g L⁻¹).\n"
-        "4. Save systemic fungicides for later if pressure stays low."
+        "1. Gently pinch off the spotted leaves; *burn* them immediately.\n"
+        "2. Clean your pruner with rubbing alcohol between each cut.\n"
+        "3. Mix 2 tablespoons of non-systemic copper powder per 10-L bucket and spray lightly.\n"
+        "4. If spots stay after five days, mix one teaspoon of weak systemic fungicide in a bucket and repeat.\n"
+        "5. Mark flagged trees with a ribbon so you can track them later."
     ),
     ("Moderate", "Low"): (
-        "1. Spot-spray copper oxychloride 2 g L⁻¹ on clusters with lesions.\n"
-        "2. Prune twigs with > 30 % infected leaves.\n"
-        "3. Re-check in 3 days; if spots expand, move up to a systemic.\n"
-        "4. Rotate fungicide group on the next spray."
+        "1. In a 10-L bucket, mix 2 tablespoons of sticker-type copper oxychloride powder; spray only the spotted areas.\n"
+        "2. Cut off twigs with more than 30% spots; *burn* the cuttings.\n"
+        "3. Check again in three days; if still active, mix 2 small teaspoons of mid-strength systemic fungicide in a bucket and spray.\n"
+        "4. Next time, switch to a different brand or type to avoid resistance.\n"
+        "5. Keep a simple diary: note date, weather, and what dose you used."
     ),
     ("Severe", "Low"): (
-        "1. Remove heavily infected branches and *burn* them off-site.\n"
-        "2. Spray azoxystrobin 0.2 mL L⁻¹ + mancozeb 2 g L⁻¹ over the canopy.\n"
-        "3. Flag these trees for weekly follow-up.\n"
-        "4. Seal big cuts with wound paint to block reinfection."
+        "1. Cut out and *burn* all badly infected branches.\n"
+        "2. Mix half a teaspoon of azoxystrobin plus 2 tablespoons of mancozeb powder in a 10-L bucket of water; spray the whole tree.\n"
+        "3. Repeat this spray once a week; if you still see spots, add one extra teaspoon of systemic next time.\n"
+        "4. After pruning, seal large cuts with tree wound paint (about one tablespoon).\n"
+        "5. Write down the batch number from the fungicide pack so you notice if it stops working."
     ),
-
-    # -------------------------- MEDIUM RISK ------------------------- #
+    # MEDIUM RISK
     ("Healthy", "Medium"): (
-        "1. Blanket-spray copper hydroxide 2 g L⁻¹.\n"
-        "2. Thin the crowded interior so leaves dry faster.\n"
-        "3. Book a second copper round in 12 days."
+        "1. Fill a 10-L bucket and add 2 scoops (tablespoons) of copper hydroxide powder; spray the entire canopy lightly.\n"
+        "2. Trim branches to let sun and wind dry leaves faster.\n"
+        "3. If leaves stay wet, next round use the same mix but add a sticker agent (one small spoon).\n"
+        "4. Keep a paper log of treatments alongside weather notes for future use."
     ),
     ("Mild", "Medium"): (
-        "1. Collect and remove infected foliage.\n"
-        "2. Spray chlorothalonil 3 g L⁻¹ today.\n"
-        "3. Follow with azoxystrobin 0.2 mL L⁻¹ after 7 days.\n"
-        "4. **Rotate** to a different fungicide class next spray."
+        "1. Gather fallen and diseased leaves and *burn* them.\n"
+        "2. Mix 3 tablespoons of chlorothalonil powder per 10-L bucket; spray fully today.\n"
+        "3. If rain is expected, add one teaspoon of sticker; if sun is fierce, add one teaspoon of sun-protectant.\n"
+        "4. Next month, use a different class of fungicide to keep spores guessing.\n"
+        "5. Try an organic spray like Bacillus subtilis—mix two spoons per bucket for extra help."
     ),
     ("Moderate", "Medium"): (
-        "1. Mix tebuconazole 0.2 mL L⁻¹ + mancozeb 2 g L⁻¹; spray to runoff.\n"
-        "2. Prune and burn infected twigs.\n"
-        "3. Repeat systemic in 7–10 days if lesions stay active.\n"
-        "4. Switch fungicide class at the next application."
+        "1. In 10 L water, mix one teaspoon of tebuconazole and 2 tablespoons of mancozeb; spray until runoff.\n"
+        "2. Prune and *burn* any twigs with spots.\n"
+        "3. In 7–10 days, use one teaspoon of higher-strength systemic if you still see spots.\n"
+        "4. If rain is likely, stick with sticker powder; if not, use wettable powder under sun.\n"
+        "5. Put water-sensitive test papers on leaves to see if spray covers well, then adjust nozzle if needed."
     ),
     ("Severe", "Medium"): (
-        "1. Lop off fruiting twigs with lesions; burn them.\n"
-        "2. Spray propiconazole 0.25 mL L⁻¹ + mancozeb 2 g L⁻¹.\n"
-        "3. Re-inspect in 5 days; keep rotating systemics until new growth is clean.\n"
-        "4. Seal pruning wounds to stop fresh spores entering."
+        "1. Cut and *burn* heavily diseased twigs; block off the area for workers.\n"
+        "2. Mix half a teaspoon of propiconazole plus 2 tablespoons of mancozeb per bucket; spray thoroughly.\n"
+        "3. After five days, if spots persist, upgrade to a stronger systemic at one teaspoon per bucket.\n"
+        "4. Seal cuts with tree wound paint (2 tablespoons) and add sticker or sun-protect agent as needed.\n"
+        "5. If still no improvement, call an agronomist for advice."
     ),
-
-    # --------------------------- HIGH RISK -------------------------- #
+    # HIGH RISK
     ("Healthy", "High"): (
-        "1. Within 24 h spray copper oxychloride 2 g L⁻¹.\n"
-        "2. Keep a 7-day copper schedule until weather calms.\n"
-        "3. Improve drainage and avoid overhead irrigation."
+        "1. Within 24 hours, mix 2 tablespoons of copper oxychloride and one teaspoon of sticker in a bucket; spray all wet leaves.\n"
+        "2. Repeat every seven days until the rain stops.\n"
+        "3. Check gutters and irrigation pipes for drips that keep leaves wet; fix leaks.\n"
+        "4. Make simple rain guards or covers over young trees if you can."
     ),
     ("Mild", "High"): (
-        "1. Within 24 h spray azoxystrobin 0.2 mL L⁻¹ + mancozeb 2 g L⁻¹.\n"
-        "2. Remove reachable infected leaves only if canopy loss < 10 %.\n"
-        "3. Check lesions every 3 days; keep a 7-day spray interval.\n"
-        "4. Rotate fungicide class each cycle."
+        "1. In 10 L, mix half a teaspoon of azoxystrobin plus 2 tablespoons of mancozeb; spray today.\n"
+        "2. Burn removed leaves; if spots return, add one teaspoon more systemic next time.\n"
+        "3. Inspect trees every three days; act fast if you see new spots.\n"
+        "4. Always include one teaspoon of sticker if rain is on the forecast.\n"
+        "5. Set phone alerts for weather changes to plan your sprays."
     ),
     ("Moderate", "High"): (
-        "1. Prune branches with heavy spotting before spraying.\n"
-        "2. Within 24 h tank-mix azoxystrobin 0.2 mL L⁻¹ + tebuconazole 0.25 mL L⁻¹ + mancozeb 2 g L⁻¹.\n"
-        "3. Spray every 5–7 days until wetness hours drop below 6 h.\n"
-        "4. Rotate fungicide class every round."
+        "1. Prune and *burn* spotted branches immediately.\n"
+        "2. Mix half a teaspoon of azoxystrobin, half a teaspoon of tebuconazole, and 2 tablespoons of mancozeb; spray thoroughly.\n"
+        "3. Do this every 5–7 days; if sun is strong, switch to wettable powder next round.\n"
+        "4. Change to a different systemic brand each time.\n"
+        "5. Mark spray dates on a wall calendar or phone for regular care."
     ),
     ("Severe", "High"): (
-        "1. Quarantine the block—essential staff only.\n"
-        "2. Destroy the worst 30 % of foliage and burn it down-wind.\n"
-        "3. Start a 3-spray rotation: day 0 difenoconazole 0.3 mL L⁻¹ + chlorothalonil 3 g L⁻¹;\n"
-        "   day 5 propiconazole + mancozeb; day 10 repeat day 0 mix.\n"
-        "4. Seal all pruning cuts with wound paint.\n"
-        "5. Keep rotating fungicides every 5 days."
+        "1. Quarantine the area; only trained staff wearing gloves and masks.\n"
+        "2. Burn worst 30% of leaves then mix 3 tablespoons of chlorothalonil and one teaspoon of difenoconazole; spray at once.\n"
+        "3. On day five, use half a teaspoon of propiconazole plus 2 tablespoons of mancozeb; on day ten, repeat the first mix.\n"
+        "4. Seal big cuts with two tablespoons of wound paint; add one teaspoon of sticker if rain comes.\n"
+        "5. If spots still appear, shorten spray gap to every five days and increase dose by half a spoon.\n"
+        "6. Plan major pruning when trees are resting (off-season) to remove hidden spores."
     ),
 }
 
-_INFO_MATRIX: Dict[tuple[str, str], str] = {
+_ACTION_LABEL_MATRIX: Dict[Tuple[str, str], str] = {
+    ("Healthy", "Low"): "Maintain",
+    ("Healthy", "Medium"): "Prevent",
+    ("Healthy", "High"): "Prevent",
+    ("Mild", "Low"): "Prevent",
+    ("Mild", "Medium"): "Prevent",
+    ("Mild", "High"): "Treat",
+    ("Moderate", "Low"): "Monitor / Treat",
+    ("Moderate", "Medium"): "Treat",
+    ("Moderate", "High"): "Intensive Treatment",
+    ("Severe", "Low"): "Treat",
+    ("Severe", "Medium"): "Intensive Treatment",
+    ("Severe", "High"): "Emergency Action",
+}
+
+_INFO_MATRIX: Dict[Tuple[str, str], str] = {
     ("Healthy", "Low"): (
         "Cool, dry weather slows spores—watchful waiting is enough."
     ),
@@ -205,30 +174,12 @@ def get_recommendation(
     temperature: float,
     wetness: float,
 ) -> Dict[str, str]:
-    """
-    Decide what a mango grower should do *today*.
-
-    Parameters
-    ----------
-    severity_idx : int    0 = Healthy … 3 = Severe (from the ResNet model)
-    humidity     : float  Relative humidity (%)
-    temperature  : float  °C
-    wetness      : float  Hours leaf surface stayed wet
-
-    Returns
-    -------
-    dict with keys
-        severity_label – text version of the index
-        weather_risk   – Low / Medium / High
-        advice         – numbered action steps
-        info           – one-liner science behind those steps
-    """
     severity_label = CLASS_LABELS[severity_idx]
     risk_label     = _weather_risk(temperature, humidity, wetness)
-
     return {
         "severity_label": severity_label,
         "weather_risk":   risk_label,
+        "action_label":   _ACTION_LABEL_MATRIX[(severity_label, risk_label)],
         "advice":         _RULE_MATRIX[(severity_label, risk_label)],
         "info":           _INFO_MATRIX[(severity_label, risk_label)],
     }
