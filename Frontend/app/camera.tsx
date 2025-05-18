@@ -19,9 +19,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 /* constants                                                           */
 /* ------------------------------------------------------------------- */
 
-const MAX_PHOTOS  = 10;
-const ENDPOINT    = 'https://gopher-loved-largely.ngrok-free.app/getPrescription';
+const LOCAL_ENDPOINT = 'http://192.168.1.166:8000/getPrescription'; // replace with your LAN IP
+const NGROK_ENDPOINT = 'https://gopher-loved-largely.ngrok-free.app/getPrescription';
+const MAX_PHOTOS      = 10;
 const OPEN_WEATHER_API_KEY = process.env.EXPO_PUBLIC_OWM_KEY ?? '';
+
+async function fetchWithFallback(formData: FormData) {
+  try {
+    const localRes = await fetch(LOCAL_ENDPOINT, { method: 'POST', body: formData });
+    if (localRes.ok) return localRes;
+    console.warn(`Local API returned ${localRes.status}, falling back to Ngrok`);
+  } catch (err) {
+    console.warn('Local fetch failed, falling back to Ngrok:', err);
+  }
+  // fallback to Ngrok URL
+  return fetch(NGROK_ENDPOINT, { method: 'POST', body: formData });
+}
 
 /* ------------------------------------------------------------------- */
 /* component                                                           */
@@ -103,7 +116,7 @@ export default function CameraScreen() {
       /* ──────── 2. fetch weather ─── */
       let humidity = 0,
           temperature = 0,
-          wetness = 0;                     // mm rain (3 h) or precip
+          wetness = 0;                 
 
       try {
         /* primary source – OpenWeatherMap */
@@ -152,11 +165,10 @@ export default function CameraScreen() {
       fd.append('lat',         String(latitude));
       fd.append('lon',         String(longitude));
 
-      /* ──────── 4. POST to API ────── */
-      const res = await fetch(ENDPOINT, { method: 'POST', body: fd });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
+      /* ──────── 4. POST to API with fallback ────── */
+       const res = await fetchWithFallback(fd);
+       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+       const data = await res.json();
 
       /* ──────── 5. navigate to result */
       router.push({
