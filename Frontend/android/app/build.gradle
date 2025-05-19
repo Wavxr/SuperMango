@@ -87,7 +87,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.supermango"
+    namespace 'com.waver.SuperMango'
     defaultConfig {
         applicationId 'com.waver.SuperMango'
         minSdkVersion rootProject.ext.minSdkVersion
