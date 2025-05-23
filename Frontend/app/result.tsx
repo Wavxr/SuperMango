@@ -40,7 +40,7 @@ export default function ResultScreen() {
     recommendation,
   } = useLocalSearchParams();
 
-  const insets = useSafeAreaInsets();                       // ⬅️ NEW
+  const insets = useSafeAreaInsets();                       
   const router = useRouter();
   const [showRec, setShowRec] = useState(false);
   const [lang, setLang] = useState<'en' | 'tl'>('en');
@@ -391,43 +391,36 @@ export default function ResultScreen() {
               </Text>
               <Image source={AvatarImg} style={styles.avatar} />
 
-              {/* Risk Badge */}
-              <View
-                style={[
-                  styles.riskBadge,
-                  {
-                    backgroundColor:
-                      rec.weather_risk === 'Low'
-                        ? '#43A047'
-                        : rec.weather_risk === 'Medium'
-                        ? '#FFA000'
-                        : '#E53935',
-                  },
-                ]}>
-                <Text style={styles.riskText}>
-                  {displayRisk} {lang === 'tl' ? 'Panganib' : 'Risk'}
-                </Text>
-              </View>
-
               {/* Advice List */}
               <View style={styles.modernCard}>
-                {adviceText.split('\n').map((line, i) => (
-                  <View key={i} style={styles.adviceRow}>
-                    <View
-                      style={[
-                        styles.bulletContainer,
-                        { backgroundColor: `${severityColor}20` },
-                      ]}>
-                      <Text style={[styles.bullet, { color: severityColor }]}>
-                        {i + 1}
+                {adviceText.split('\n').map((line, i) => {
+                  const startsWithNumber = /^\d+\./.test(line.trim()); // Check if line starts with a number
+
+                  return (
+                    <View key={i} style={styles.adviceRow}>
+                      {startsWithNumber && ( // Only show bullet if line starts with a number
+                        <View
+                          style={[
+                            styles.bulletContainer,
+                            { backgroundColor: `${severityColor}20` },
+                          ]}>
+                          <Text style={[styles.bullet, { color: severityColor }]}>
+                            {i + 1}
+                          </Text>
+                        </View>
+                      )}
+                      <Text
+                        style={[
+                          styles.adviceText,
+                          !startsWithNumber && { marginLeft: 34 }, // Adjust for no bullet
+                        ]}>
+                        {line.replace(/^\d+\.\s*/, '')} {/* Remove the number if present */}
                       </Text>
                     </View>
-                    <Text style={styles.adviceText}>
-                      {line.replace(/^\d+\.\s*/, '')}
-                    </Text>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
+
 
               {/* Why Card */}
               <View style={styles.modernCard}>
