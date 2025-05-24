@@ -220,9 +220,9 @@ function ModernLoadingScreen({ visible, progress }: { visible: boolean; progress
     >
       <LinearGradient
         colors={[
-          'rgba(255, 183, 77, 0.95)',
-          'rgba(255, 152, 0, 0.95)',
-          'rgba(255, 111, 0, 0.95)'
+          'rgba(250, 210, 97, 0.95)',  // warm soft yellow
+          'rgba(234, 179, 8, 0.95)',   // amber yellow (similar to #EAB308)
+          'rgba(181, 159, 0, 0.95)',   // darker golden yellow
         ]}
         style={styles.loadingGradient}
         start={{ x: 0, y: 0 }}
