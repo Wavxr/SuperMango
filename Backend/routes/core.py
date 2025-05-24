@@ -23,7 +23,7 @@ import json
 NUM_CLASSES        = 4
 CLASS_LABELS       = ["Healthy", "Mild", "Moderate", "Severe"]
 MAX_SEVERITY_SCORE = NUM_CLASSES - 1            # 0-based classes → 3
-MODEL_PATH         = "models/best_model.pt"
+MODEL_PATH         = "models/resnet50_fold_3.pt"
 
 # single resize / tensor transform reused for every image
 TRANSFORM = T.Compose([
