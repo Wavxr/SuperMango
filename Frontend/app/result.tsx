@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: '#92400E',
     textAlign: 'center',
@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFBEB',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 10,
     borderRadius: 16,
     borderWidth: 1,
