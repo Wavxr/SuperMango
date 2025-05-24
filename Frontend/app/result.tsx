@@ -510,13 +510,19 @@ export default function ResultScreen() {
                 <TouchableOpacity
                   style={styles.saveBtn}
                   onPress={() => setSaveModal(true)}
+                  activeOpacity={0.8}
                 >
-                  <Ionicons name="save" size={18} color="#fff" />
+                  <View style={styles.saveBtnIconContainer}>
+                    <Ionicons name="save" size={18} color="#fff" />
+                  </View>
                   <Text style={styles.saveTxt}>
                     {lang === 'tl' ? 'I-save ang Payo' : 'Save Recommendation'}
                   </Text>
                 </TouchableOpacity>
               )}
+
+              {/* Spacer */}
+              <View style={{ height: 15 }} />
 
 
               {/* Why Card */}
@@ -538,21 +544,38 @@ export default function ResultScreen() {
       <Modal
               visible={saveModal}
               transparent
-              animationType="slide"
+              animationType="fade"
               onRequestClose={() => setSaveModal(false)}
             >
               <View style={styles.modalOverlay}>
-                <View style={styles.modalBox}>
-                  <Text style={styles.modalTitle}>
-                    {lang === 'tl' ? 'I-save ang Puno' : 'Save Tree'}
-                  </Text>
+                <Animated.View style={styles.modalBox}>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>
+                      {lang === 'tl' ? 'I-save ang Puno' : 'Save Tree'}
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.closeButton} 
+                      onPress={() => setSaveModal(false)}
+                    >
+                      <Ionicons name="close" size={24} color="#718096" />
+                    </TouchableOpacity>
+                  </View>
 
-                  <TextInput
-                    style={styles.input}
-                    placeholder={lang === 'tl' ? 'Pangalan' : 'Tree name'}
-                    value={treeName}
-                    onChangeText={setTreeName}
-                  />
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>
+                      {lang === 'tl' ? 'Pangalan ng Puno' : 'Tree Name'}
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={lang === 'tl' ? 'Pangalan' : 'Enter tree name'}
+                      value={treeName}
+                      onChangeText={setTreeName}
+                    />
+                  </View>
+
+                  <Text style={styles.sectionLabel}>
+                    {lang === 'tl' ? 'Larawan ng Puno' : 'Tree Photo'}
+                  </Text>
 
                   <View style={styles.modalBtnsRow}>
                     <TouchableOpacity style={styles.miniBtn} onPress={takePhoto}>
@@ -569,33 +592,39 @@ export default function ResultScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {treeImage && (
-                    <Image
-                      source={{ uri: treeImage }}
-                      style={{ width: '100%', height: 160, borderRadius: 8 }}
-                    />
+                  {treeImage ? (
+                    <View style={styles.imagePreviewContainer}>
+                      <Image
+                        source={{ uri: treeImage }}
+                        style={styles.imagePreview}
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Ionicons name="image-outline" size={40} color="#CBD5E0" />
+                      <Text style={styles.placeholderText}>
+                        {lang === 'tl' ? 'Walang larawan' : 'No image selected'}
+                      </Text>
+                    </View>
                   )}
 
                   <TouchableOpacity
-                    style={styles.bigBtn}
+                    style={[styles.bigBtn, !treeName || !treeImage ? styles.bigBtnDisabled : null]}
                     onPress={saveToStorage}
-                    disabled={saving}
+                    disabled={saving || !treeName || !treeImage}
                   >
                     {saving ? (
                       <ActivityIndicator color="#fff" />
                     ) : (
-                      <Text style={styles.bigBtnTxt}>
-                        {lang === 'tl' ? 'I-save' : 'Save'}
-                      </Text>
+                      <>
+                        <Ionicons name="checkmark-circle" size={20} color="#fff" style={{marginRight: 8}} />
+                        <Text style={styles.bigBtnTxt}>
+                          {lang === 'tl' ? 'I-save' : 'Save'}
+                        </Text>
+                      </>
                     )}
                   </TouchableOpacity>
-
-                  <TouchableOpacity onPress={() => setSaveModal(false)}>
-                    <Text style={{ textAlign: 'center', marginTop: 12 }}>
-                      {lang === 'tl' ? 'Kanselahin' : 'Cancel'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                </Animated.View>
               </View>
             </Modal>
 
@@ -885,47 +914,168 @@ saveBtn: {
   marginTop: 16,
   backgroundColor: '#4CAF50',
   paddingVertical: 12,
-  paddingHorizontal: 20,
+  paddingHorizontal: 24,
   borderRadius: 30,
+  elevation: 4,
+  shadowColor: '#4CAF50',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
 },
-saveTxt: { color: '#fff', marginLeft: 8, fontWeight: '600' },
+saveBtnIconContainer: {
+  backgroundColor: 'rgba(255,255,255,0.2)',
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 10,
+},
+saveTxt: { 
+  color: '#fff', 
+  fontWeight: '600',
+  fontSize: 15,
+},
 
 /* -------- modal -------- */
 modalOverlay: {
   flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.45)',
+  backgroundColor: 'rgba(0,0,0,0.6)',
   justifyContent: 'center',
   padding: 24,
 },
-modalBox: { backgroundColor: '#fff', borderRadius: 16, padding: 20 },
-modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
+modalBox: { 
+  backgroundColor: '#fff', 
+  borderRadius: 20, 
+  padding: 24,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 10 },
+  shadowOpacity: 0.25,
+  shadowRadius: 10,
+  elevation: 10,
+},
+modalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 20,
+  borderBottomWidth: 1,
+  borderBottomColor: '#EDF2F7',
+  paddingBottom: 12,
+},
+modalTitle: { 
+  fontSize: 22, 
+  fontWeight: '700', 
+  color: '#2D3748',
+},
+closeButton: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: '#F7FAFC',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+inputContainer: {
+  marginBottom: 16,
+},
+inputLabel: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#4A5568',
+  marginBottom: 6,
+},
+sectionLabel: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#4A5568',
+  marginBottom: 10,
+},
 input: {
   borderWidth: 1,
-  borderColor: '#CBD5E0',
-  borderRadius: 8,
-  padding: 10,
-  marginBottom: 12,
+  borderColor: '#E2E8F0',
+  borderRadius: 12,
+  padding: 12,
+  fontSize: 15,
+  backgroundColor: '#F7FAFC',
 },
 modalBtnsRow: {
   flexDirection: 'row',
   justifyContent: 'space-between',
-  marginBottom: 12,
+  marginBottom: 16,
 },
 miniBtn: {
   flexDirection: 'row',
   alignItems: 'center',
   backgroundColor: '#4CAF50',
-  paddingVertical: 8,
-  paddingHorizontal: 14,
-  borderRadius: 8,
+  paddingVertical: 10,
+  paddingHorizontal: 16,
+  borderRadius: 12,
+  flex: 0.48,
+  justifyContent: 'center',
+  elevation: 2,
+  shadowColor: '#4CAF50',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 3,
 },
-miniBtnTxt: { color: '#fff', marginLeft: 6 },
-bigBtn: {
-  backgroundColor: '#4CAF50',
-  paddingVertical: 12,
-  borderRadius: 8,
+miniBtnTxt: { 
+  color: '#fff', 
+  marginLeft: 8,
+  fontWeight: '600',
+  fontSize: 14,
+},
+imagePreviewContainer: {
+  marginVertical: 16,
+  borderRadius: 16,
+  overflow: 'hidden',
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+},
+imagePreview: { 
+  width: '100%', 
+  height: 180, 
+  borderRadius: 16,
+},
+imagePlaceholder: {
+  width: '100%',
+  height: 180,
+  borderRadius: 16,
+  backgroundColor: '#F7FAFC',
+  justifyContent: 'center',
   alignItems: 'center',
+  marginVertical: 16,
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+  borderStyle: 'dashed',
 },
-bigBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 16 },
-
+placeholderText: {
+  color: '#A0AEC0',
+  marginTop: 8,
+  fontSize: 14,
+},
+bigBtn: {
+  flexDirection: 'row',
+  backgroundColor: '#4CAF50',
+  paddingVertical: 14,
+  borderRadius: 12,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 8,
+  elevation: 4,
+  shadowColor: '#4CAF50',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+},
+bigBtnDisabled: {
+  backgroundColor: '#A0AEC0',
+  elevation: 0,
+  shadowOpacity: 0,
+},
+bigBtnTxt: { 
+  color: '#fff', 
+  fontWeight: '700', 
+  fontSize: 16
+},
 });
