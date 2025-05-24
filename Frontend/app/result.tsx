@@ -1,5 +1,3 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,15 +8,22 @@ import {
   Image,
   Dimensions,
   Animated,
-  Platform,
+  Modal,
+  TextInput,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';   // ⬅️ NEW
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-
-// Avatar Image
 import AvatarImg from '../assets/images/avatar.png';
 
-// Types
+/* ------------------------------------------------------------------ */
+/* ---------------------------- types -------------------------------- */
+
 type Recommendation = {
   severity_label: string;
   weather_risk: 'Low' | 'Medium' | 'High';
@@ -31,6 +36,7 @@ type Recommendation = {
 };
 
 export default function ResultScreen() {
+  /* ------------ nav / params ------------- */
   const {
     psi,
     overallLabel,
@@ -38,13 +44,21 @@ export default function ResultScreen() {
     temperature,
     wetness,
     recommendation,
+    savedView, // "true" when opened from Saved tab
   } = useLocalSearchParams();
-
-  const insets = useSafeAreaInsets();                       
   const router = useRouter();
+
+  /* ------------ ui state ----------------- */
+  const insets = useSafeAreaInsets();
   const [showRec, setShowRec] = useState(false);
   const [lang, setLang] = useState<'en' | 'tl'>('en');
   const fadeAnim = useState(new Animated.Value(0))[0];
+
+  /* save modal */
+  const [saveModal, setSaveModal] = useState(false);
+  const [treeName, setTreeName] = useState('');
+  const [treeImage, setTreeImage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -125,6 +139,74 @@ export default function ResultScreen() {
   const scanAgain = () => router.replace('/');
   const toggleLang = () => setLang((prev) => (prev === 'en' ? 'tl' : 'en'));
 
+   /* -------------- effects ---------------- */
+   useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [showRec, lang]);
+
+  /* ------------------------------------------------------------------ */
+  /* --------------------- save-feature helpers ----------------------- */
+
+  const pickImage = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!res.canceled) setTreeImage(res.assets[0].uri);
+  };
+
+  const takePhoto = async () => {
+    const res = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!res.canceled) setTreeImage(res.assets[0].uri);
+  };
+
+  const saveToStorage = async () => {
+    if (!treeName || !treeImage) {
+      Alert.alert('Missing info', 'Please add a tree name and photo.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const key = 'savedRecommendations';
+      const raw = await AsyncStorage.getItem(key);
+      const list = raw ? JSON.parse(raw) : [];
+      list.push({
+        id: Date.now().toString(),
+        name: treeName,
+        image: treeImage,
+        timestamp: Date.now(),
+        payload: {
+          psi,
+          overallLabel,
+          humidity,
+          temperature,
+          wetness,
+          recommendation,
+        },
+      });
+      await AsyncStorage.setItem(key, JSON.stringify(list));
+      setSaveModal(false);
+      setTreeName('');
+      setTreeImage(null);
+      Alert.alert('Saved', 'Recommendation stored locally.');
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* ---------------------------- render ------------------------------- */
   return (
     <View
       style={[
@@ -361,6 +443,8 @@ export default function ResultScreen() {
             </View>
           </>
         ) : (
+
+          /* ---------- second panel (recommendations) ---------- */
           <>
             <ScrollView
               contentContainerStyle={styles.content}
@@ -394,11 +478,11 @@ export default function ResultScreen() {
               {/* Advice List */}
               <View style={styles.modernCard}>
                 {adviceText.split('\n').map((line, i) => {
-                  const startsWithNumber = /^\d+\./.test(line.trim()); // Check if line starts with a number
+                  const startsWithNumber = /^\d+\./.test(line.trim()); 
 
                   return (
                     <View key={i} style={styles.adviceRow}>
-                      {startsWithNumber && ( // Only show bullet if line starts with a number
+                      {startsWithNumber && ( 
                         <View
                           style={[
                             styles.bulletContainer,
@@ -412,7 +496,7 @@ export default function ResultScreen() {
                       <Text
                         style={[
                           styles.adviceText,
-                          !startsWithNumber && { marginLeft: 34 }, // Adjust for no bullet
+                          !startsWithNumber && { marginLeft: 34 }, 
                         ]}>
                         {line.replace(/^\d+\.\s*/, '')} {/* Remove the number if present */}
                       </Text>
@@ -420,6 +504,19 @@ export default function ResultScreen() {
                   );
                 })}
               </View>
+
+              {/* --- Save button (only if not in savedView) --- */}
+              {!savedView && (
+                <TouchableOpacity
+                  style={styles.saveBtn}
+                  onPress={() => setSaveModal(true)}
+                >
+                  <Ionicons name="save" size={18} color="#fff" />
+                  <Text style={styles.saveTxt}>
+                    {lang === 'tl' ? 'I-save ang Payo' : 'Save Recommendation'}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
 
               {/* Why Card */}
@@ -436,6 +533,72 @@ export default function ResultScreen() {
           </>
         )}
       </Animated.View>
+
+      {/* ---------------- save modal ---------------- */}
+      <Modal
+              visible={saveModal}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setSaveModal(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalBox}>
+                  <Text style={styles.modalTitle}>
+                    {lang === 'tl' ? 'I-save ang Puno' : 'Save Tree'}
+                  </Text>
+
+                  <TextInput
+                    style={styles.input}
+                    placeholder={lang === 'tl' ? 'Pangalan' : 'Tree name'}
+                    value={treeName}
+                    onChangeText={setTreeName}
+                  />
+
+                  <View style={styles.modalBtnsRow}>
+                    <TouchableOpacity style={styles.miniBtn} onPress={takePhoto}>
+                      <Ionicons name="camera" size={20} color="#fff" />
+                      <Text style={styles.miniBtnTxt}>
+                        {lang === 'tl' ? 'Kamera' : 'Camera'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.miniBtn} onPress={pickImage}>
+                      <Ionicons name="images" size={20} color="#fff" />
+                      <Text style={styles.miniBtnTxt}>
+                        {lang === 'tl' ? 'Gallery' : 'Gallery'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {treeImage && (
+                    <Image
+                      source={{ uri: treeImage }}
+                      style={{ width: '100%', height: 160, borderRadius: 8 }}
+                    />
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.bigBtn}
+                    onPress={saveToStorage}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.bigBtnTxt}>
+                        {lang === 'tl' ? 'I-save' : 'Save'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => setSaveModal(false)}>
+                    <Text style={{ textAlign: 'center', marginTop: 12 }}>
+                      {lang === 'tl' ? 'Kanselahin' : 'Cancel'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+
     </View>
   );
 }
@@ -714,4 +877,55 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+/* -------- save button -------- */
+saveBtn: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  alignSelf: 'center',
+  marginTop: 16,
+  backgroundColor: '#4CAF50',
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  borderRadius: 30,
+},
+saveTxt: { color: '#fff', marginLeft: 8, fontWeight: '600' },
+
+/* -------- modal -------- */
+modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.45)',
+  justifyContent: 'center',
+  padding: 24,
+},
+modalBox: { backgroundColor: '#fff', borderRadius: 16, padding: 20 },
+modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 12 },
+input: {
+  borderWidth: 1,
+  borderColor: '#CBD5E0',
+  borderRadius: 8,
+  padding: 10,
+  marginBottom: 12,
+},
+modalBtnsRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginBottom: 12,
+},
+miniBtn: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#4CAF50',
+  paddingVertical: 8,
+  paddingHorizontal: 14,
+  borderRadius: 8,
+},
+miniBtnTxt: { color: '#fff', marginLeft: 6 },
+bigBtn: {
+  backgroundColor: '#4CAF50',
+  paddingVertical: 12,
+  borderRadius: 8,
+  alignItems: 'center',
+},
+bigBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
 });
