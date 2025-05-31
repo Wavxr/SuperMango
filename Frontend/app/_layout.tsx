@@ -50,41 +50,47 @@ function InnerLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="camera"
-        options={{
-          title: 'Scan',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="scan" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="result"
-        options={{
-          title: 'Result',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="analytics" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="saved-trees"
-        options={{
-          title: 'Saved Trees',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="folder" size={size} color={color} />
-          ),
-        }}
-      />
+      name="index"
+      options={{
+        title: 'Home',
+        tabBarIcon: ({ color, size }) => (
+          <Ionicons name="home" size={size} color={color} />
+        ),
+      }}
+    />
+    <Tabs.Screen
+      name="camera"
+      options={{
+        title: 'Scan',
+        tabBarIcon: ({ color, size }) => (
+          <Ionicons name="scan" size={size} color={color} />
+        ),
+      }}
+    />
+    <Tabs.Screen
+      name="result"
+      options={{
+        title: 'Result',
+        tabBarIcon: ({ color, size }) => (
+          <Ionicons name="analytics" size={size} color={color} />
+        ),
+      }}
+    />
+    <Tabs.Screen
+      name="saved-trees"
+      options={{
+        title: 'Saved Trees',
+        tabBarIcon: ({ color, size }) => (
+          <Ionicons name="folder" size={size} color={color} />
+        ),
+      }}
+    />
+    <Tabs.Screen
+      name="how-to-scan"
+      options={{
+        href: null,
+      }}
+    />    
     </Tabs>
   );
 }
