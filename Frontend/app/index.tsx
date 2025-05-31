@@ -365,7 +365,7 @@ export default function HomeScreen() {
             >
               <TouchableOpacity
                 style={styles.mainButton}
-                onPress={() => router.push('/camera')}
+                onPress={() => router.push('/how-to-scan')}
                 activeOpacity={0.9}
               >
                 <LinearGradient
