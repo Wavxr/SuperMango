@@ -1,6 +1,5 @@
 import { Tabs } from 'expo-router/tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { Platform } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,85 +11,92 @@ function InnerLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          height: 60 + insets.bottom, // Add safe bottom padding
-          paddingBottom: insets.bottom, // Add space for gesture nav
-          backgroundColor: Platform.OS === 'ios' ? 'transparent' : '#FFFFFF',
-          borderTopWidth: 0,
-          elevation: 4,
-          shadowColor: '#000',
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom,
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#FDE68A',
+          elevation: 8,
+          shadowColor: '#F59E0B',
           shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 3,
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
           position: 'absolute',
           bottom: 0,
         },
-        tabBarBackground: () =>
-          Platform.OS === 'ios' ? (
-            <BlurView
-              tint="light"
-              intensity={95}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(255,255,255,0.8)',
-              }}
-            />
-          ) : null,
-        tabBarActiveTintColor: '#4CAF50',
-        tabBarInactiveTintColor: '#9E9E9E',
+        tabBarBackground: () => null,
+        tabBarActiveTintColor: '#F59E0B',
+        tabBarInactiveTintColor: '#9CA3AF',
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '500',
+          fontWeight: '600',
           marginBottom: 5,
         },
-        tabBarIconStyle: { marginTop: 5 },
+        tabBarIconStyle: { 
+          marginTop: 5,
+        },
       }}
     >
       <Tabs.Screen
-      name="index"
-      options={{
-        title: 'Home',
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name="home" size={size} color={color} />
-        ),
-      }}
-    />
-    <Tabs.Screen
-      name="camera"
-      options={{
-        title: 'Scan',
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name="scan" size={size} color={color} />
-        ),
-      }}
-    />
-    <Tabs.Screen
-      name="result"
-      options={{
-        title: 'Result',
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name="analytics" size={size} color={color} />
-        ),
-      }}
-    />
-    <Tabs.Screen
-      name="saved-trees"
-      options={{
-        title: 'Saved Trees',
-        tabBarIcon: ({ color, size }) => (
-          <Ionicons name="folder" size={size} color={color} />
-        ),
-      }}
-    />
-    <Tabs.Screen
-      name="how-to-scan"
-      options={{
-        href: null,
-      }}
-    />    
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "home" : "home-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="camera"
+        options={{
+          title: 'Scan',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "scan" : "scan-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="result"
+        options={{
+          title: 'Result',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "analytics" : "analytics-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="saved-trees"
+        options={{
+          title: 'Saved',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "folder" : "folder-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="how-to-scan"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="summary"
+        options={{ href: null }}
+      />
     </Tabs>
   );
 }

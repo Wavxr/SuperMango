@@ -348,9 +348,9 @@ export default function HomeScreen() {
                 },
               ]}
             >
-              <Text style={styles.subtitle}>AI-Powered Mango Leaf Health Analysis</Text>
+              <Text style={styles.subtitle}>AI-Powered Severity Classification Tool</Text>
               <Text style={styles.description}>
-                Detect Anthracnose disease early with advanced machine learning
+                Get consistent severity insights and treatment tips for mango leaves with visible anthracnose signs
               </Text>
             </Animated.View>
 
@@ -387,32 +387,32 @@ export default function HomeScreen() {
           {/* Features Section */}
           <View style={styles.featuresSection}>
             <Text style={styles.sectionTitle}>What You Can Do</Text>
-            
+
             <View style={styles.featuresGrid}>
               <FeatureCard
                 icon="camera"
                 title="Scan Leaves"
                 description="Capture mango leaf photos for instant analysis"
                 onPress={() => router.push('/camera')}
-                gradient={[theme.colors.primary, theme.colors.primaryLight]}
+                gradient={['#10B981', '#34D399']} // green shades
                 delay={200}
               />
-              
+
               <FeatureCard
                 icon="library"
                 title="View History"
                 description="Access your saved tree health records"
                 onPress={() => router.push('/saved-trees')}
-                gradient={[theme.colors.secondary, '#FBBF24']}
+                gradient={['#FACC15', '#FDE68A']} // yellow shades
                 delay={400}
               />
-              
+
               <FeatureCard
                 icon="analytics"
                 title="Health Reports"
                 description="Get detailed analysis and recommendations"
                 onPress={() => router.push('/camera')}
-                gradient={[theme.colors.accent, '#FB923C']}
+                gradient={['#3B82F6', '#60A5FA']} // blue shades
                 delay={600}
               />
               
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
 
   // Features Section
   featuresSection: {
-    marginTop: theme.spacing.xl,
+    marginTop: theme.spacing.xsl,
   },
   sectionTitle: {
     fontSize: 24,

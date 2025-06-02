@@ -542,7 +542,7 @@ export default function CameraScreen() {
 
       // Use replace instead of push to avoid navigation issues
       router.replace({
-        pathname: '/result',
+        pathname: '/summary',
         params: {
           psi: String(data.percent_severity_index),
           overallLabel: data.overall_label,

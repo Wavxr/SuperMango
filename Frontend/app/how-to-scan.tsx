@@ -26,14 +26,6 @@ import {
       },
     },
     {
-      emoji: "⬜",
-      title: { en: "Plain Background", tl: "Simpleng Pangatras" },
-      description: {
-        en: "Use white paper or dry soil behind the leaf.",
-        tl: "Gamitin ang puting papel o tuyong lupa bilang likuran.",
-      },
-    },
-    {
       emoji: "🍃",
       title: { en: "One Leaf Only", tl: "Isang Dahon Lamang" },
       description: {
@@ -383,7 +375,7 @@ import {
           style={[
             styles.buttonContainer,
             { 
-              paddingBottom: insets.bottom + 100,
+              paddingBottom: insets.bottom + 80,
               transform: [{ scale: Animated.multiply(buttonScale, pulseAnim) }],
             }
           ]}
