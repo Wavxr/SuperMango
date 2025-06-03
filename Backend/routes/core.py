@@ -54,12 +54,12 @@ def log_image(idx: int, image: Image.Image) -> None:
     w, h = image.size
     print(f"🖼️  {idx:02d} | {w}×{h} | {image.mode}")
 
-def log_summary(preds: List[Dict[str, Any]], psi: float, overall: str) -> None:
+def log_summary(preds: List[Dict[str, Any]], psi: float, overall: str, overall_conf: float) -> None:
     print("\n────────── Batch summary ──────────")
     for p in preds:
-        print(f" • {p['idx']:02d}  {p['label']:<8}  (class={p['severity']})")
+        print(f" • {p['idx']:02d}  {p['label']:<8}  ({p['confidence']:5.1f}%)")
     print("───────────────────────────────────")
-    print(f" PSI: {psi:6.2f}%   Overall: {overall}")
+    print(f" PSI: {psi:6.2f}%   Overall: {overall}   Confidence: {overall_conf:5.1f}%")
     print("───────────────────────────────────\n")
 
 def log_response_json(resp: Dict[str, Any]) -> None:
@@ -94,10 +94,19 @@ async def getPrescription(
         input_tensor = TRANSFORM(img).unsqueeze(0)
 
         with torch.no_grad():
-            severity = int(torch.argmax(model(input_tensor), dim=1).item())
-            label = CLASS_LABELS[severity]
+            logits = model(input_tensor)                  # raw scores
+            probs  = torch.softmax(logits, dim=1)[0]      # probabilities
+            severity = int(torch.argmax(probs).item())
+            confidence = float(probs[severity] * 100)     # % confidence
 
-        predictions.append({"idx": idx, "severity": severity, "label": label})
+        label = CLASS_LABELS[severity]
+
+        predictions.append({
+            "idx":        idx,
+            "severity":   severity,
+            "label":      label,
+            "confidence": confidence,
+        })
         severity_sum += severity
 
     # ------------- batch metrics --------------------------------------
@@ -108,11 +117,9 @@ async def getPrescription(
         3: 15,   # Severe: baseline estimate (can go higher, but conservative)
     }
 
-    # Compute PSI by summing estimated lesion % across leaves
     total_psi = sum(estimated_area_by_class[p["severity"]] for p in predictions)
     psi = round(total_psi / len(predictions), 2)  # PSI = avg lesion %
 
-    # Use RRL-based thresholds for label assignment
     if psi == 0:
         overall_label = "Healthy"
     elif psi <= 3:
@@ -123,6 +130,7 @@ async def getPrescription(
         overall_label = "Severe"
 
     overall_idx = CLASS_LABELS.index(overall_label)
+    overall_confidence = round(sum(p["confidence"] for p in predictions) / len(predictions), 2)
 
     # ------------- recommendation ----------------------------------------
     recommendation = get_recommendation(
@@ -145,11 +153,11 @@ async def getPrescription(
             "lon":         lon,
         },
         "recommendation": recommendation
-        # "individual_predictions": predictions,  
+        # "individual_predictions": predictions,
     }
 
     # ------------- logging --------------------------------------------
-    log_summary(predictions, psi, overall_label)
+    log_summary(predictions, psi, overall_label, overall_confidence)
     log_response_json(api_response)
 
     return api_response

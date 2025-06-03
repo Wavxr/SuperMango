@@ -534,7 +534,28 @@ export default function CameraScreen() {
       
       setLoadingProgress(0.9);
       await new Promise(resolve => setTimeout(resolve, 400));
-      const data = await res.json();
+      
+      //check if res is right response
+      let data: any;
+      try {
+        data = await res.json();
+
+        if (typeof data === 'string') {
+          Alert.alert(
+            'Try Again',
+            'Some photos were unclear. Please retake them following the instructions before scanning.'
+          );
+          return;
+        }
+
+        if (!data?.overall_label || !data?.recommendation) {
+          Alert.alert('Error', 'Something went wrong. Please try again.');
+          return;
+        }
+      } catch {
+        Alert.alert('Error', 'Something went wrong. Please try again.');
+        return;
+      }
 
       // Step 5: Complete (100%)
       setLoadingProgress(1);
