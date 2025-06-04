@@ -12,16 +12,17 @@ import {
   StatusBar,
   Animated,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 /* ------------------------------------------------------------------- */
 /* constants                                                           */
 /* ------------------------------------------------------------------- */
 
-const LOCAL_ENDPOINT = 'http://192.168.1.166:8000/getPrescription';
 const NGROK_ENDPOINT = 'https://gopher-loved-largely.ngrok-free.app/getPrescription';
 const MAX_PHOTOS = 10;
 const OPEN_WEATHER_API_KEY = process.env.EXPO_PUBLIC_OWM_KEY ?? '';
@@ -29,14 +30,180 @@ const OPEN_WEATHER_API_KEY = process.env.EXPO_PUBLIC_OWM_KEY ?? '';
 const { width, height } = Dimensions.get('window');
 
 async function fetchWithFallback(formData: FormData) {
-  try {
-    const localRes = await fetch(LOCAL_ENDPOINT, { method: 'POST', body: formData });
-    if (localRes.ok) return localRes;
-    console.warn(`Local API returned ${localRes.status}, falling back to Ngrok`);
-  } catch (err) {
-    console.warn('Local fetch failed, falling back to Ngrok:', err);
-  }
   return fetch(NGROK_ENDPOINT, { method: 'POST', body: formData });
+}
+
+/* ------------------------------------------------------------------- */
+/* Modern Alert Modal Component                                        */
+/* ------------------------------------------------------------------- */
+
+function ModernAlertModal({ 
+  visible, 
+  onClose, 
+  language = 'en' 
+}: { 
+  visible: boolean; 
+  onClose: () => void;
+  language?: 'en' | 'tl';
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const content = {
+    en: {
+      title: 'Unclear Photos Detected',
+      message: 'One or more photos were not recognized as mango leaves. Please ensure all photos clearly show the leaf against a proper background.',
+      instruction: 'Refer to the scanning instructions before trying again.',
+      buttonText: 'Got it',
+    },
+    tl: {
+      title: 'Hindi Malinaw na Larawan',
+      message: 'Hindi nakilala ang isa o higit pang larawan bilang dahon ng mangga. Siguraduhing malinaw na nakikita ang dahon sa tamang background.',
+      instruction: 'Basahin muna ang mga tagubilin sa pag-scan bago subukan ulit.',
+      buttonText: 'Naintindihan',
+    },
+  };
+
+  const currentContent = content[language];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <Animated.View 
+        style={[
+          styles.modalOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          activeOpacity={1} 
+          onPress={onClose}
+        />
+        
+        <Animated.View
+          style={[
+            styles.modalContainer,
+            {
+              transform: [
+                { scale: scaleAnim },
+                { translateY: slideAnim }
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#FFFFFF', '#FEFEFE']}
+            style={styles.modalGradient}
+          >
+            {/* Header with Icon */}
+            <View style={styles.modalHeader}>
+              <View style={styles.iconContainer}>
+                <LinearGradient
+                  colors={['#FEF3C7', '#FDE68A']}
+                  style={styles.iconGradient}
+                >
+                  <Ionicons name="warning" size={32} color="#F59E0B" />
+                </LinearGradient>
+              </View>
+              <Text style={styles.modalTitle}>{currentContent.title}</Text>
+            </View>
+
+            {/* Content */}
+            <View style={styles.modalContent}>
+              <Text style={styles.modalMessage}>
+                {currentContent.message}
+              </Text>
+              
+              <View style={styles.instructionContainer}>
+                <View style={styles.instructionIcon}>
+                  <Ionicons name="information-circle" size={20} color="#F59E0B" />
+                </View>
+                <Text style={styles.instructionText}>
+                  {currentContent.instruction}
+                </Text>
+              </View>
+
+              {/* Visual Guide */}
+              <View style={styles.visualGuide}>
+                <View style={styles.guideItem}>
+                  <Text style={styles.guideEmoji}>✅</Text>
+                  <Text style={styles.guideText}>
+                    {language === 'en' ? 'Clear leaf photo' : 'Malinaw na dahon'}
+                  </Text>
+                </View>
+                <View style={styles.guideItem}>
+                  <Text style={styles.guideEmoji}>❌</Text>
+                  <Text style={styles.guideText}>
+                    {language === 'en' ? 'Blurry or unclear' : 'Malabo o hindi malinaw'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Action Button */}
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={onClose}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#F59E0B', '#FCD34D']}
+                style={styles.buttonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.buttonText}>{currentContent.buttonText}</Text>
+                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </LinearGradient>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
 }
 
 /* ------------------------------------------------------------------- */
@@ -404,6 +571,8 @@ export default function CameraScreen() {
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [language] = useState<'en' | 'tl'>('en'); // You can make this dynamic based on user preference
   const router = useRouter();
 
   const haveTen = images.length === MAX_PHOTOS;
@@ -413,7 +582,10 @@ export default function CameraScreen() {
   const handleCapture = async () => {
     if (!cameraRef.current || haveTen) return;
     try {
-      const { uri } = await cameraRef.current.takePictureAsync({ skipProcessing: true });
+      const { uri } = await cameraRef.current.takePictureAsync({ 
+        quality: 0.7, 
+        skipProcessing: true,
+      });
       setImages(prev => [...prev, uri].slice(0, MAX_PHOTOS));
     } catch (err) {
       console.error('❌ Capture error:', err);
@@ -437,7 +609,7 @@ export default function CameraScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
         selectionLimit: MAX_PHOTOS - images.length,
-        quality: 1,
+        quality: 0.7,
       });
 
       if (!result.canceled) {
@@ -461,18 +633,15 @@ export default function CameraScreen() {
     try {
       // Step 1: Location (20%)
       setLoadingProgress(0.1);
-      await new Promise(resolve => setTimeout(resolve, 300)); // Smooth transition
       const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
       if (locStatus !== 'granted') throw new Error('Location permission denied');
       
       setLoadingProgress(0.2);
-      await new Promise(resolve => setTimeout(resolve, 200));
       const { coords } = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = coords;
 
       // Step 2: Weather (40%)
       setLoadingProgress(0.3);
-      await new Promise(resolve => setTimeout(resolve, 300));
       let humidity = 0, temperature = 0, wetness = 0;
 
       try {
@@ -505,11 +674,9 @@ export default function CameraScreen() {
       }
 
       setLoadingProgress(0.4);
-      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Step 3: Prepare FormData (60%)
       setLoadingProgress(0.5);
-      await new Promise(resolve => setTimeout(resolve, 400));
       const fd = new FormData();
       images.forEach((uri, i) => {
         const ext = uri.split('.').pop()?.split('?')[0] ?? 'jpg';
@@ -524,16 +691,13 @@ export default function CameraScreen() {
       fd.append('lon', String(longitude));
 
       setLoadingProgress(0.6);
-      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Step 4: Upload and analyze (90%)
       setLoadingProgress(0.7);
-      await new Promise(resolve => setTimeout(resolve, 500));
       const res = await fetchWithFallback(fd);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       
       setLoadingProgress(0.9);
-      await new Promise(resolve => setTimeout(resolve, 400));
       
       //check if res is right response
       let data: any;
@@ -541,10 +705,7 @@ export default function CameraScreen() {
         data = await res.json();
 
         if (typeof data === 'string') {
-          Alert.alert(
-            'Try Again',
-            'Some photos were unclear. Please retake them following the instructions before scanning.'
-          );
+          setShowAlertModal(true);
           return;
         }
 
@@ -559,7 +720,7 @@ export default function CameraScreen() {
 
       // Step 5: Complete (100%)
       setLoadingProgress(1);
-      await new Promise(resolve => setTimeout(resolve, 800)); // Show completion
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Use replace instead of push to avoid navigation issues
       router.replace({
@@ -626,6 +787,12 @@ export default function CameraScreen() {
       </View>
 
       <ModernLoadingScreen visible={loading} progress={loadingProgress} />
+      
+      <ModernAlertModal 
+        visible={showAlertModal} 
+        onClose={() => setShowAlertModal(false)}
+        language={language}
+      />
     </View>
   );
 }
@@ -706,6 +873,129 @@ const styles = RNStyleSheet.create({
     backgroundColor: '#fbc02d',
     borderWidth: 2,
     borderColor: '#fff',
+  },
+
+  // Modern Alert Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  modalContainer: {
+    width: width * 0.9,
+    maxWidth: 400,
+    borderRadius: 24,
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+  },
+  modalGradient: {
+    padding: 24,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  iconContainer: {
+    marginBottom: 16,
+    borderRadius: 32,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  iconGradient: {
+    width: 64,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#92400E',
+    textAlign: 'center',
+  },
+  modalContent: {
+    marginBottom: 24,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  instructionContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  instructionIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  instructionText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#92400E',
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  visualGuide: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  guideItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  guideEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  guideText: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  modalButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  buttonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 
   // Enhanced Loading Screen Styles
@@ -890,15 +1180,5 @@ const styles = RNStyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
-  },
-  buttonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderRadius: 30,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
   },
 });
