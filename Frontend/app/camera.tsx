@@ -13,6 +13,8 @@ import {
   Animated,
   Dimensions,
   Modal,
+  ScrollView,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -31,6 +33,478 @@ const { width, height } = Dimensions.get('window');
 
 async function fetchWithFallback(formData: FormData) {
   return fetch(NGROK_ENDPOINT, { method: 'POST', body: formData });
+}
+
+/* ------------------------------------------------------------------- */
+/* Preview Modal Component                                             */
+/* ------------------------------------------------------------------- */
+
+function PreviewModal({ 
+  visible, 
+  images,
+  onClose,
+  onProceed,
+  onRemoveImage,
+  language = 'en' 
+}: { 
+  visible: boolean; 
+  images: string[];
+  onClose: () => void;
+  onProceed: () => void;
+  onRemoveImage: (index: number) => void;
+  language?: 'en' | 'tl';
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const isComplete = images.length === MAX_PHOTOS;
+  const remaining = MAX_PHOTOS - images.length;
+
+  const content = {
+    en: {
+      title: 'Review Your Photos',
+      subtitle: isComplete 
+        ? `${images.length} photos ready for analysis` 
+        : `${images.length} photos captured • ${remaining} more needed`,
+      description: 'Make sure all photos clearly show mango leaves. Tap any photo to remove it.',
+      proceedButton: 'Looks good, proceed',
+      backButton: isComplete ? 'Add/Remove Photos' : `Add ${remaining} More Photos`,
+      needMoreText: `You need ${remaining} more photo${remaining === 1 ? '' : 's'} to proceed with analysis.`,
+    },
+    tl: {
+      title: 'Suriin ang mga Larawan',
+      subtitle: isComplete 
+        ? `${images.length} larawan na handa para sa pagsusuri` 
+        : `${images.length} larawan na nakuha • ${remaining} pa ang kailangan`,
+      description: 'Siguraduhing lahat ng larawan ay malinaw na nagpapakita ng dahon ng mangga. I-tap ang kahit anong larawan para tanggalin.',
+      proceedButton: 'Mukhang ayos, magpatuloy',
+      backButton: isComplete ? 'Magdagdag/Magtanggal ng Larawan' : `Magdagdag ng ${remaining} Pang Larawan`,
+      needMoreText: `Kailangan mo ng ${remaining} pang larawan para makapag-proceed sa analysis.`,
+    },
+  };
+
+  const currentContent = content[language];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <Animated.View 
+        style={[
+          styles.modalOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          activeOpacity={1} 
+          onPress={onClose}
+        />
+        
+        <Animated.View
+          style={[
+            styles.previewContainer,
+            {
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#FFFFFF', '#FEFEFE']}
+            style={styles.previewGradient}
+          >
+            {/* Header */}
+            <View style={styles.previewHeader}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onClose}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+              
+              <View style={styles.previewHeaderContent}>
+                <View style={styles.previewIconContainer}>
+                  <LinearGradient
+                    colors={['#FEF3C7', '#FDE68A']}
+                    style={styles.previewIconGradient}
+                  >
+                    <Ionicons name="images" size={28} color="#F59E0B" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.previewTitle}>{currentContent.title}</Text>
+                <Text style={[
+                  styles.previewSubtitle,
+                  { color: isComplete ? '#10B981' : '#F59E0B' }
+                ]}>
+                  {currentContent.subtitle}
+                </Text>
+              </View>
+            </View>
+
+            {/* Description */}
+            <View style={styles.previewDescription}>
+              <View style={styles.previewDescIcon}>
+                <Ionicons name="information-circle" size={20} color="#F59E0B" />
+              </View>
+              <Text style={styles.previewDescText}>
+                {currentContent.description}
+              </Text>
+            </View>
+
+            {/* Progress Indicator */}
+            <View style={styles.progressIndicator}>
+              <View style={styles.progressBar}>
+                <Animated.View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${(images.length / MAX_PHOTOS) * 100}%`,
+                      backgroundColor: isComplete ? '#10B981' : '#F59E0B',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {images.length}/{MAX_PHOTOS} photos
+              </Text>
+            </View>
+
+            {/* Need More Photos Warning */}
+            {!isComplete && (
+              <View style={styles.warningContainer}>
+                <View style={styles.warningIcon}>
+                  <Ionicons name="alert-circle" size={20} color="#F59E0B" />
+                </View>
+                <Text style={styles.warningText}>
+                  {currentContent.needMoreText}
+                </Text>
+              </View>
+            )}
+
+            {/* Photo Grid */}
+            <ScrollView 
+              style={styles.photoGrid}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.photoContainer}>
+                {images.map((uri, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.photoItem}
+                    onPress={() => onRemoveImage(index)}
+                    activeOpacity={0.8}
+                  >
+                    <Image source={{ uri }} style={styles.photoImage} />
+                    <View style={styles.photoOverlay}>
+                      <View style={styles.removeButton}>
+                        <Ionicons name="trash" size={16} color="#FFFFFF" />
+                      </View>
+                      <Text style={styles.photoNumber}>{index + 1}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                
+                {/* Empty slots */}
+                {Array.from({ length: remaining }, (_, index) => (
+                  <View key={`empty-${index}`} style={styles.emptySlot}>
+                    <View style={styles.emptySlotContent}>
+                      <Ionicons name="add" size={24} color="#D1D5DB" />
+                      <Text style={styles.emptySlotText}>
+                        {images.length + index + 1}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* Action Buttons */}
+            <View style={styles.previewButtons}>
+              {/* Back/Add More Button */}
+              <TouchableOpacity
+                style={[styles.previewButton, styles.backButton]}
+                onPress={onClose}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={isComplete ? ['#6366F1', '#8B5CF6'] : ['#F59E0B', '#FCD34D']}
+                  style={styles.previewButtonGradient}
+                >
+                  <Ionicons 
+                    name={isComplete ? "camera" : "add"} 
+                    size={20} 
+                    color="#FFFFFF" 
+                    style={{ marginRight: 8 }} 
+                  />
+                  <Text style={styles.previewButtonText}>{currentContent.backButton}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Proceed Button - Only show if complete */}
+              {isComplete && (
+                <TouchableOpacity
+                  style={[styles.previewButton, styles.proceedButton]}
+                  onPress={onProceed}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['#10B981', '#34D399']}
+                    style={styles.previewButtonGradient}
+                  >
+                    <Text style={styles.previewButtonText}>{currentContent.proceedButton}</Text>
+                    <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 8 }} />
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            </View>
+          </LinearGradient>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------- */
+/* Verification Modal Component                                        */
+/* ------------------------------------------------------------------- */
+
+function VerificationModal({ 
+  visible, 
+  onSubmit, 
+  onVerifyFirst,
+  onClose,
+  language = 'en' 
+}: { 
+  visible: boolean; 
+  onSubmit: () => void;
+  onVerifyFirst: () => void;
+  onClose: () => void;
+  language?: 'en' | 'tl';
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.3,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const content = {
+    en: {
+      title: "Verify Photos First?",
+      message: "Are you sure all the leaves you submitted are Sweet Elena mango leaves?",
+      description: "If you're not completely sure, you can run a quick check to help confirm your photos show the right type of leaves.",
+      yesButton: "Yes, I'm sure - No need to Verify",
+      noButton: "Run verification test first",
+    },    
+    tl: {
+      title: 'I-verify Muna ang mga Larawan?',
+      message: 'Sigurado ka ba na lahat ng dahon na inyong ipinasa ay dahon ng Sweet Elena mango?',
+      description: 'Kung hindi ka sigurado, maaari kang mag-run ng mabilis na check para ma-confirm na tama ang uri ng dahon sa mga larawan mo.',
+      yesButton: 'Oo, sigurado ako — i-submit na',
+      noButton: 'I-run muna ang verification test',
+    },
+  };
+
+  const currentContent = content[language];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <Animated.View 
+        style={[
+          styles.modalOverlay,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          activeOpacity={1} 
+          onPress={onClose}
+        />
+        
+        <Animated.View
+          style={[
+            styles.verificationContainer,
+            {
+              transform: [
+                { scale: scaleAnim },
+                { translateY: slideAnim }
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#FFFFFF', '#FEFEFE']}
+            style={styles.verificationGradient}
+          >
+            {/* Close Button */}
+            <TouchableOpacity
+              style={styles.verificationCloseButton}
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={24} color="#6B7280" />
+            </TouchableOpacity>
+
+            {/* Header with Icon */}
+            <View style={styles.verificationHeader}>
+              <View style={styles.verificationIconContainer}>
+                <LinearGradient
+                  colors={['#FEF3C7', '#FDE68A']}
+                  style={styles.verificationIconGradient}
+                >
+                  <Ionicons name="checkmark-circle" size={32} color="#F59E0B" />
+                </LinearGradient>
+              </View>
+              <Text style={styles.verificationTitle}>{currentContent.title}</Text>
+            </View>
+
+            {/* Content */}
+            <View style={styles.verificationContent}>
+              <Text style={styles.verificationMessage}>
+                {currentContent.message}
+              </Text>
+              
+              <View style={styles.verificationDescription}>
+                <View style={styles.verificationDescIcon}>
+                  <Ionicons name="information-circle" size={20} color="#F59E0B" />
+                </View>
+                <Text style={styles.verificationDescText}>
+                  {currentContent.description}
+                </Text>
+              </View>
+
+              {/* Visual indicators */}
+              <View style={styles.verificationOptions}>
+                <View style={styles.optionItem}>
+                  <Text style={styles.optionEmoji}>🚀</Text>
+                  <Text style={styles.optionText}>
+                    {language === 'en' ? 'Direct submission' : 'Direktang pag-submit'}
+                  </Text>
+                </View>
+                <View style={styles.optionItem}>
+                  <Text style={styles.optionEmoji}>🔍</Text>
+                  <Text style={styles.optionText}>
+                    {language === 'en' ? 'Verify first' : 'I-verify muna'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.verificationButtons}>
+              {/* Yes, Submit Button */}
+              <TouchableOpacity
+                style={[styles.verificationButton, styles.submitButton]}
+                onPress={onSubmit}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#10B981', '#34D399']}
+                  style={styles.verificationButtonGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Ionicons name="rocket" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.verificationButtonText}>{currentContent.yesButton}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* No, Verify First Button */}
+              <TouchableOpacity
+                style={[styles.verificationButton, styles.verifyButton]}
+                onPress={onVerifyFirst}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#F59E0B', '#FCD34D']}
+                  style={styles.verificationButtonGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Ionicons name="search" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.verificationButtonText}>{currentContent.noButton}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
 }
 
 /* ------------------------------------------------------------------- */
@@ -572,10 +1046,13 @@ export default function CameraScreen() {
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [showAlertModal, setShowAlertModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [language] = useState<'en' | 'tl'>('en'); // You can make this dynamic based on user preference
   const router = useRouter();
 
   const haveTen = images.length === MAX_PHOTOS;
+  const hasImages = images.length > 0;
 
   useFocusEffect(useCallback(() => setCameraKey(Math.random()), []));
 
@@ -621,12 +1098,53 @@ export default function CameraScreen() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleRemoveImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearAllPhotos = () => {
+    Alert.alert(
+      'Clear All Photos',
+      'Are you sure you want to remove all captured photos?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Clear All', 
+          style: 'destructive',
+          onPress: () => setImages([])
+        }
+      ]
+    );
+  };
+
+  const handleSubmitClick = () => {
     if (!haveTen) {
       Alert.alert(`Need ${MAX_PHOTOS} photos`, 'Please add more images.');
       return;
     }
+    setShowPreviewModal(true);
+  };
 
+  const handlePreviewProceed = () => {
+    setShowPreviewModal(false);
+    setShowVerificationModal(true);
+  };
+
+  const handleDirectSubmit = () => {
+    setShowVerificationModal(false);
+    performSubmission(false); // verify_first = false
+  };
+
+  const handleVerifyFirst = () => {
+    setShowVerificationModal(false);
+    performSubmission(true); // verify_first = true
+  };
+
+  const handleCloseVerification = () => {
+    setShowVerificationModal(false);
+  };
+
+  const performSubmission = async (verifyFirst: boolean) => {
     setLoading(true);
     setLoadingProgress(0);
 
@@ -689,6 +1207,7 @@ export default function CameraScreen() {
       fd.append('wetness', String(wetness));
       fd.append('lat', String(latitude));
       fd.append('lon', String(longitude));
+      fd.append('verify_first', String(verifyFirst)); // Add verification flag
 
       setLoadingProgress(0.6);
 
@@ -772,15 +1291,38 @@ export default function CameraScreen() {
       <View style={styles.overlay}>
         <View style={styles.header}>
           <Text style={styles.headerText}>{`Photos: ${images.length}/${MAX_PHOTOS}`}</Text>
+          {hasImages && (
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={handleClearAllPhotos}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#EF4444', '#F87171']}
+                style={styles.clearButtonGradient}
+              >
+                <Ionicons name="trash" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.clearButtonText}>Clear All</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.buttonContainer}>
           {haveTen ? (
-            <MainButton onPress={handleSubmit} loading={loading} label="Submit All (10)" />
+            <MainButton onPress={handleSubmitClick} loading={loading} label="Review & Submit" />
           ) : (
             <>
               <MainButton onPress={handleCapture} loading={loading} icon />
               <MainButton onPress={handlePick} loading={loading} label="Upload Photo(s)" />
+              {hasImages && (
+                <MainButton 
+                  onPress={() => setShowPreviewModal(true)} 
+                  loading={loading} 
+                  label={`Preview (${images.length})`}
+                  secondary
+                />
+              )}
             </>
           )}
         </View>
@@ -793,23 +1335,52 @@ export default function CameraScreen() {
         onClose={() => setShowAlertModal(false)}
         language={language}
       />
+
+      <PreviewModal
+        visible={showPreviewModal}
+        images={images}
+        onClose={() => setShowPreviewModal(false)}
+        onProceed={handlePreviewProceed}
+        onRemoveImage={handleRemoveImage}
+        language={language}
+      />
+
+      <VerificationModal
+        visible={showVerificationModal}
+        onSubmit={handleDirectSubmit}
+        onVerifyFirst={handleVerifyFirst}
+        onClose={handleCloseVerification}
+        language={language}
+      />
     </View>
   );
 }
 
 /* --------------------------- Sub-components ------------------------- */
 
-function MainButton({ onPress, loading, label, icon }: {
-  onPress: () => void; loading: boolean; label?: string; icon?: boolean;
+function MainButton({ onPress, loading, label, icon, secondary }: {
+  onPress: () => void; loading: boolean; label?: string; icon?: boolean; secondary?: boolean;
 }) {
   return (
-    <TouchableOpacity style={styles.captureButton} onPress={onPress} disabled={loading}>
+    <TouchableOpacity 
+      style={[
+        styles.captureButton, 
+        secondary && styles.secondaryButton
+      ]} 
+      onPress={onPress} 
+      disabled={loading}
+    >
       {loading ? (
         <ActivityIndicator color="#fff" size="large" />
       ) : icon ? (
         <View style={styles.captureInner} />
       ) : (
-        <Text style={{ color: '#fff', textAlign: 'center', fontSize: 16, fontWeight: '600' }}>
+        <Text style={{ 
+          color: secondary ? '#F59E0B' : '#fff', 
+          textAlign: 'center', 
+          fontSize: 16, 
+          fontWeight: '600' 
+        }}>
           {label}
         </Text>
       )}
@@ -849,8 +1420,37 @@ const styles = RNStyleSheet.create({
     paddingBottom: 20,
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
   },
-  headerText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  headerText: { 
+    color: '#fff', 
+    fontSize: 18, 
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+  },
+  clearButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  clearButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  clearButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   buttonContainer: { alignItems: 'center', paddingBottom: 100 },
   captureButton: {
     width: 150,
@@ -866,6 +1466,11 @@ const styles = RNStyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
+  secondaryButton: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(245, 158, 11, 0.5)',
+  },
   captureInner: {
     width: 50,
     height: 50,
@@ -873,6 +1478,366 @@ const styles = RNStyleSheet.create({
     backgroundColor: '#fbc02d',
     borderWidth: 2,
     borderColor: '#fff',
+  },
+
+  // Preview Modal Styles
+  previewContainer: {
+    width: width * 0.95,
+    height: height * 0.85,
+    borderRadius: 24,
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+  },
+  previewGradient: {
+    flex: 1,
+    padding: 20,
+  },
+  previewHeader: {
+    marginBottom: 20,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewHeaderContent: {
+    alignItems: 'center',
+    paddingTop: 10,
+  },
+  previewIconContainer: {
+    marginBottom: 12,
+    borderRadius: 28,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  previewIconGradient: {
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#92400E',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  previewSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  previewDescription: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  previewDescIcon: {
+    marginRight: 8,
+    marginTop: 1,
+  },
+  previewDescText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  progressIndicator: {
+    marginBottom: 16,
+  },
+  progressBar: {
+    width: '100%',
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+  },
+  warningIcon: {
+    marginRight: 8,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    fontWeight: '600',
+  },
+  photoGrid: {
+    flex: 1,
+    marginBottom: 16,
+  },
+  photoContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingBottom: 20,
+  },
+  photoItem: {
+    width: (width * 0.95 - 60) / 3,
+    height: (width * 0.95 - 60) / 3,
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    padding: 8,
+    flexDirection: 'row',
+  },
+  removeButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoNumber: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  emptySlot: {
+    width: (width * 0.95 - 60) / 3,
+    height: (width * 0.95 - 60) / 3,
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptySlotContent: {
+    alignItems: 'center',
+  },
+  emptySlotText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  previewButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  previewButton: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  backButton: {
+    shadowColor: '#6B7280',
+  },
+  proceedButton: {
+    shadowColor: '#10B981',
+  },
+  previewButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+  },
+  previewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+
+  // Verification Modal Styles
+  verificationContainer: {
+    width: width * 0.9,
+    maxWidth: 420,
+    borderRadius: 24,
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+  },
+  verificationGradient: {
+    padding: 24,
+  },
+  verificationCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  verificationHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingTop: 8,
+  },
+  verificationIconContainer: {
+    marginBottom: 16,
+    borderRadius: 32,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  verificationIconGradient: {
+    width: 64,
+    height: 64,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  verificationTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#92400E',
+    textAlign: 'center',
+  },
+  verificationContent: {
+    marginBottom: 24,
+  },
+  verificationMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  verificationDescription: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  verificationDescIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  verificationDescText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#92400E',
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  verificationOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  optionItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  optionEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  optionText: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  verificationButtons: {
+    gap: 12,
+  },
+  verificationButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  submitButton: {
+    shadowColor: '#10B981',
+  },
+  verifyButton: {
+    shadowColor: '#F59E0B',
+  },
+  verificationButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  verificationButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
 
   // Modern Alert Modal Styles
