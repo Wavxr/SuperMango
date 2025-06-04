@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, UploadFile, File, Form
 from typing import List, Dict, Any
 from PIL import Image
@@ -6,49 +7,64 @@ import io, json, torch
 import torchvision.models as models
 import torchvision.transforms as T
 
-# ------------------------------------------------------------------ #
-# constants & helpers                                                #
-# ------------------------------------------------------------------ #
+# ──────────────────────────────────────────────────────────────────── #
+# constants & helpers                                                 #
+# ──────────────────────────────────────────────────────────────────── #
 
 NUM_CLASSES  = 5
 CLASS_LABELS = ["Healthy", "Mild", "Moderate", "Severe", "Background"]
 BG_IDX       = 4
-BG_THRESH    = 95.0                      # 95 % confidence threshold
+BG_THRESH    = 95.0
 MODEL_PATH   = "models/best_fold_model.pt"
 
 TRANSFORM = T.Compose([T.Resize((224, 224)), T.ToTensor()])
 
 def load_model() -> torch.nn.Module:
-    model = models.resnet50(weights=None)
-    model.fc = torch.nn.Linear(model.fc.in_features, NUM_CLASSES)
+    m = models.resnet50(weights=None)
+    m.fc = torch.nn.Linear(m.fc.in_features, NUM_CLASSES)
     print(f"🔍 Loading model from: {MODEL_PATH}")
-    state_dict = torch.load(MODEL_PATH, map_location="cpu")
-    model.load_state_dict(state_dict)
-    model.eval()
+    m.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+    m.eval()
     print("✅ Model loaded and set to eval mode")
-    return model
+    return m
 
 model  = load_model()
 router = APIRouter()
 
-# ------------------------------------------------------------------ #
-# logging helpers                                                    #
-# ------------------------------------------------------------------ #
+# ──────────────────────────────────────────────────────────────────── #
+# logging helpers                                                     #
+# ──────────────────────────────────────────────────────────────────── #
 
 def log_image(idx: int, image: Image.Image) -> None:
     w, h = image.size
     print(f"🖼️  {idx:02d} | {w}×{h} | {image.mode}")
 
 def log_prediction(idx: int, label: str, conf: float) -> None:
-    print(f" • {idx:02d}  {label:<10} ({conf:5.1f} %)")
+    print(f" • {idx:02d}  {label:<9} ({conf:6.1f} %)")
+
+def log_override(idx: int, bg_conf: float, new_lbl: str, new_conf: float) -> None:
+    print(
+        f" ⚠️  {idx:02d} suspected background ({bg_conf:6.1f} %) → "
+        f"{new_lbl} ({new_conf:6.1f} %)"
+    )
+
+def log_summary(preds: List[Dict[str, Any]],
+                psi: float, overall: str, overall_conf: float) -> None:
+    print("\n────────── Batch summary ──────────")
+    for p in preds:
+        print(f" • {p['idx']:02d}  {p['label']:<9} ({p['confidence']:6.1f}%)")
+    print("───────────────────────────────────")
+    print(f" PSI: {psi:6.2f}%   Overall: {overall:<8} "
+          f"Confidence: {overall_conf:6.1f}%")
+    print("───────────────────────────────────\n")
 
 def log_response_json(resp: Dict[str, Any]) -> None:
     pretty = json.dumps(resp, indent=2, ensure_ascii=False)
     print("📤 Response JSON ↓\n" + indent(pretty, "  ") + "\n")
 
-# ------------------------------------------------------------------ #
-# route                                                              #
-# ------------------------------------------------------------------ #
+# ──────────────────────────────────────────────────────────────────── #
+# route                                                                #
+# ──────────────────────────────────────────────────────────────────── #
 
 @router.post("/getPrescription")
 async def getPrescription(
@@ -59,60 +75,53 @@ async def getPrescription(
     lat:         float = Form(...),
     lon:         float = Form(...),
 ) -> Any:
+
     print(f"\n📷  Received {len(files)} image(s)")
     predictions: List[Dict[str, Any]] = []
 
-    # -------- per-image inference ------------------------------------ #
+    # ——— per-image inference ——————————————————————————————— #
     for idx, file in enumerate(files):
         img_bytes = await file.read()
         img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+        # first log the basic image info
         log_image(idx, img)
 
+        # inference
         input_tensor = TRANSFORM(img).unsqueeze(0)
         with torch.no_grad():
             probs = torch.softmax(model(input_tensor), dim=1)[0]
 
-        # top-2 classes and their probabilities
-        values, indices = torch.topk(probs, 2)
-        cls_top        = int(indices[0].item())
-        conf_top       = float(values[0] * 100)
+        values, indices = torch.topk(probs, 2)          # top-2
+        top_cls, sec_cls = map(int, indices.tolist())
+        top_conf, sec_conf = (float(v * 100) for v in values)
 
-        # assume top prediction; may change below
-        cls        = cls_top
-        confidence = conf_top
+        cls, confidence = top_cls, top_conf
 
-        # Background with < 95 % ⇒ fall back to next-best class
-        if cls_top == BG_IDX and conf_top < BG_THRESH:
-            cls        = int(indices[1].item())
-            confidence = float(values[1] * 100)
-            # log the override
-            print(
-                f"⚠️  {idx:02d} suspected background ({conf_top:5.1f} %) → "
-                f"{CLASS_LABELS[cls]} ({confidence:5.1f} %)"
-            )
+        # background with low confidence → override
+        if top_cls == BG_IDX and top_conf < BG_THRESH:
+            cls, confidence = sec_cls, sec_conf
+            log_override(idx, top_conf, CLASS_LABELS[cls], confidence)
 
-        label = CLASS_LABELS[cls]
-        log_prediction(idx, label, confidence)
+        # final per-image prediction line
+        log_prediction(idx, CLASS_LABELS[cls], confidence)
 
         predictions.append({
             "idx":        idx,
             "class_idx":  cls,
-            "label":      label,
+            "label":      CLASS_LABELS[cls],
             "confidence": confidence,
         })
 
-    # -------- confident background check ----------------------------- #
+    # ——— confident background check ———————————————————————— #
     if any(p["class_idx"] == BG_IDX for p in predictions):
         print("\n🛑 Confident background detected – skipping analysis.\n")
         return "Some background found."
 
-    # ------------------------------------------------------------------#
-    # No confident background → continue with severity workflow         #
-    # ------------------------------------------------------------------#
-
-    estimated_area = {0: 0, 1: 2, 2: 8, 3: 15}
-    total_psi = sum(estimated_area[p["class_idx"]] for p in predictions)
-    psi = round(total_psi / len(predictions), 2)
+    # ——— lesion-severity workflow ——————————————————————————— #
+    area = {0: 0, 1: 2, 2: 8, 3: 15}
+    psi = round(sum(area[p["class_idx"]] for p in predictions)
+                / len(predictions), 2)
 
     overall_label = (
         "Healthy"  if psi == 0 else
@@ -149,5 +158,8 @@ async def getPrescription(
         # "individual_predictions": predictions,
     }
 
+    # final tidy logs
+    log_summary(predictions, psi, overall_label, overall_conf)
     log_response_json(api_response)
+
     return api_response
