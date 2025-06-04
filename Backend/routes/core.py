@@ -1,41 +1,26 @@
-"""
-routes/resnet.py
-FastAPI route for batch severity prediction on mango-leaf images.
-Includes weather + location metadata (humidity, temperature, wetness, lat, lon)
-received from the mobile app.
-"""
-
 from fastapi import APIRouter, UploadFile, File, Form
 from typing import List, Dict, Any
 from PIL import Image
 from textwrap import indent
-from services.rule_service import get_recommendation
-import io
-import torch
+import io, json, torch
 import torchvision.models as models
 import torchvision.transforms as T
-import json
 
-# --------------------------------------------------------------------- #
-# constants & helpers                                                   #
-# --------------------------------------------------------------------- #
+# ------------------------------------------------------------------ #
+# constants & helpers                                                #
+# ------------------------------------------------------------------ #
 
-NUM_CLASSES        = 4
-CLASS_LABELS       = ["Healthy", "Mild", "Moderate", "Severe"]
-MAX_SEVERITY_SCORE = NUM_CLASSES - 1            # 0-based classes → 3
-MODEL_PATH         = "models/resnet50_fold_3.pt"
+NUM_CLASSES  = 5
+CLASS_LABELS = ["Healthy", "Mild", "Moderate", "Severe", "Background"]
+BG_IDX       = 4
+BG_THRESH    = 95.0                      # 95 % confidence threshold
+MODEL_PATH   = "models/best_fold_model.pt"
 
-# single resize / tensor transform reused for every image
-TRANSFORM = T.Compose([
-    T.Resize((224, 224)),
-    T.ToTensor(),
-])
+TRANSFORM = T.Compose([T.Resize((224, 224)), T.ToTensor()])
 
 def load_model() -> torch.nn.Module:
-    """Load a ResNet-50, attach new FC head, and set to eval on CPU."""
     model = models.resnet50(weights=None)
     model.fc = torch.nn.Linear(model.fc.in_features, NUM_CLASSES)
-
     print(f"🔍 Loading model from: {MODEL_PATH}")
     state_dict = torch.load(MODEL_PATH, map_location="cpu")
     model.load_state_dict(state_dict)
@@ -43,108 +28,116 @@ def load_model() -> torch.nn.Module:
     print("✅ Model loaded and set to eval mode")
     return model
 
-model = load_model()
+model  = load_model()
 router = APIRouter()
 
-# --------------------------------------------------------------------- #
-# logging helpers                                                       #
-# --------------------------------------------------------------------- #
+# ------------------------------------------------------------------ #
+# logging helpers                                                    #
+# ------------------------------------------------------------------ #
 
 def log_image(idx: int, image: Image.Image) -> None:
     w, h = image.size
     print(f"🖼️  {idx:02d} | {w}×{h} | {image.mode}")
 
-def log_summary(preds: List[Dict[str, Any]], psi: float, overall: str, overall_conf: float) -> None:
-    print("\n────────── Batch summary ──────────")
-    for p in preds:
-        print(f" • {p['idx']:02d}  {p['label']:<8}  ({p['confidence']:5.1f}%)")
-    print("───────────────────────────────────")
-    print(f" PSI: {psi:6.2f}%   Overall: {overall}   Confidence: {overall_conf:5.1f}%")
-    print("───────────────────────────────────\n")
+def log_prediction(idx: int, label: str, conf: float) -> None:
+    print(f" • {idx:02d}  {label:<10} ({conf:5.1f} %)")
 
 def log_response_json(resp: Dict[str, Any]) -> None:
     pretty = json.dumps(resp, indent=2, ensure_ascii=False)
     print("📤 Response JSON ↓\n" + indent(pretty, "  ") + "\n")
 
-# --------------------------------------------------------------------- #
-# route                                                                 #
-# --------------------------------------------------------------------- #
+# ------------------------------------------------------------------ #
+# route                                                              #
+# ------------------------------------------------------------------ #
 
 @router.post("/getPrescription")
 async def getPrescription(
     files:       List[UploadFile] = File(...),
-    # weather + coords (sent as simple form fields)
     humidity:    float = Form(...),
     temperature: float = Form(...),
     wetness:     float = Form(...),
     lat:         float = Form(...),
     lon:         float = Form(...),
-) -> Dict[str, Any]:
+) -> Any:
     print(f"\n📷  Received {len(files)} image(s)")
-
     predictions: List[Dict[str, Any]] = []
-    severity_sum = 0
 
-    # ------------- per-image inference --------------------------------
+    # -------- per-image inference ------------------------------------ #
     for idx, file in enumerate(files):
         img_bytes = await file.read()
         img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
         log_image(idx, img)
 
         input_tensor = TRANSFORM(img).unsqueeze(0)
-
         with torch.no_grad():
-            logits = model(input_tensor)                  # raw scores
-            probs  = torch.softmax(logits, dim=1)[0]      # probabilities
-            severity = int(torch.argmax(probs).item())
-            confidence = float(probs[severity] * 100)     # % confidence
+            probs = torch.softmax(model(input_tensor), dim=1)[0]
 
-        label = CLASS_LABELS[severity]
+        # top-2 classes and their probabilities
+        values, indices = torch.topk(probs, 2)
+        cls_top        = int(indices[0].item())
+        conf_top       = float(values[0] * 100)
+
+        # assume top prediction; may change below
+        cls        = cls_top
+        confidence = conf_top
+
+        # Background with < 95 % ⇒ fall back to next-best class
+        if cls_top == BG_IDX and conf_top < BG_THRESH:
+            cls        = int(indices[1].item())
+            confidence = float(values[1] * 100)
+            # log the override
+            print(
+                f"⚠️  {idx:02d} suspected background ({conf_top:5.1f} %) → "
+                f"{CLASS_LABELS[cls]} ({confidence:5.1f} %)"
+            )
+
+        label = CLASS_LABELS[cls]
+        log_prediction(idx, label, confidence)
 
         predictions.append({
             "idx":        idx,
-            "severity":   severity,
+            "class_idx":  cls,
             "label":      label,
             "confidence": confidence,
         })
-        severity_sum += severity
 
-    # ------------- batch metrics --------------------------------------
-    estimated_area_by_class = {
-        0: 0,    # Healthy
-        1: 2,    # Mild: midpoint of 1–3%
-        2: 8,    # Moderate: midpoint of 4–12%
-        3: 15,   # Severe: baseline estimate (can go higher, but conservative)
-    }
+    # -------- confident background check ----------------------------- #
+    if any(p["class_idx"] == BG_IDX for p in predictions):
+        print("\n🛑 Confident background detected – skipping analysis.\n")
+        return "Some background found."
 
-    total_psi = sum(estimated_area_by_class[p["severity"]] for p in predictions)
-    psi = round(total_psi / len(predictions), 2)  # PSI = avg lesion %
+    # ------------------------------------------------------------------#
+    # No confident background → continue with severity workflow         #
+    # ------------------------------------------------------------------#
 
-    if psi == 0:
-        overall_label = "Healthy"
-    elif psi <= 3:
-        overall_label = "Mild"
-    elif psi <= 12:
-        overall_label = "Moderate"
-    else:
-        overall_label = "Severe"
+    estimated_area = {0: 0, 1: 2, 2: 8, 3: 15}
+    total_psi = sum(estimated_area[p["class_idx"]] for p in predictions)
+    psi = round(total_psi / len(predictions), 2)
 
-    overall_idx = CLASS_LABELS.index(overall_label)
-    overall_confidence = round(sum(p["confidence"] for p in predictions) / len(predictions), 2)
+    overall_label = (
+        "Healthy"  if psi == 0 else
+        "Mild"     if psi <= 3 else
+        "Moderate" if psi <= 12 else
+        "Severe"
+    )
+    overall_idx  = CLASS_LABELS.index(overall_label)
+    overall_conf = round(
+        sum(p["confidence"] for p in predictions) / len(predictions), 2
+    )
 
-    # ------------- recommendation ----------------------------------------
+    from services.rule_service import get_recommendation
     recommendation = get_recommendation(
         severity_idx = overall_idx,
         humidity     = humidity,
         temperature  = temperature,
         wetness      = wetness,
     )
-    
-    # ------------- craft response -------------------------------------
+
     api_response = {
         "percent_severity_index": psi,
         "overall_label":          overall_label,
         "overall_severity_index": overall_idx,
+        "overall_confidence":     overall_conf,
         "weather": {
             "humidity":    humidity,
             "temperature": temperature,
@@ -152,12 +145,9 @@ async def getPrescription(
             "lat":         lat,
             "lon":         lon,
         },
-        "recommendation": recommendation
+        "recommendation": recommendation,
         # "individual_predictions": predictions,
     }
 
-    # ------------- logging --------------------------------------------
-    log_summary(predictions, psi, overall_label, overall_confidence)
     log_response_json(api_response)
-
     return api_response
