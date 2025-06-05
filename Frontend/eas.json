@@ -6,11 +6,17 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_SKIP_NPM_CI": "true"
+      }
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_SKIP_NPM_CI": "true"
+      }
     },
     "production": {
       "autoIncrement": true,
