@@ -240,10 +240,10 @@ export default function SummaryScreen() {
   const slides = [
     {
       id: 'severity',
-      title: lang === 'en' ? 'Disease Severity' : 'Kalubhaan ng Sakit',
+      title: lang === 'en' ? 'Disease Severity' : 'Lala ng Sakit',
       emoji: '🩺',
       icon: 'medical',
-      subtitle: lang === 'en' ? 'Current condition of your mango tree' : 'Kasalukuyang kalagayan ng inyong puno',
+      subtitle: lang === 'en' ? 'Current condition of your mango tree' : 'Lagay ngayon ng puno ng mangga mo',
       color: severityColor,
       details: {
         psi: parseFloat(psi as string),
@@ -266,10 +266,10 @@ export default function SummaryScreen() {
     },
     {
       id: 'combined_risk',
-      title: lang === 'en' ? 'Anthracnose Severity + Spread Risk' : 'Kalubhaan ng Anthracnose + Panganib ng Pagkalat',
+      title: lang === 'en' ? 'Anthracnose Severity + Spread Risk' : 'Tindi ng Anthracnose + Lakas ng Pagkalat',
       emoji: '⚠️',
       icon: 'warning',
-      subtitle: lang === 'en' ? 'Combined assessment of disease and spread potential' : 'Pinagsama na pagtatasa ng sakit at posibilidad ng pagkalat',
+      subtitle: lang === 'en' ? 'Combined assessment of disease and spread potential' : 'Pinagsamang Tingin sa Sakit at Pagkalat',
       color: getCombinedRiskColor(overallLabel, parsedRec?.weather_risk),
       details: {
         severity: overallLabel,
@@ -291,10 +291,10 @@ export default function SummaryScreen() {
     },
     {
       id: 'summary',
-      title: lang === 'en' ? 'Quick Summary' : 'Mabilis na Buod',
+      title: lang === 'en' ? 'Quick Summary' : 'Buod ng Resulta',
       emoji: '📋',
       icon: 'document-text',
-      subtitle: lang === 'en' ? 'Ready to view detailed recommendations' : 'Handa nang tingnan ang detalyadong payo',
+      subtitle: lang === 'en' ? 'Ready to view detailed recommendations' : 'Handa na ang mga payo para sayo',
       color: theme.colors.primary,
       details: {
         ready: true,
@@ -321,12 +321,20 @@ export default function SummaryScreen() {
             
             <View style={styles.severityInfo}>
               <Text style={[styles.severityLevel, { color: slide.color }]}>
-                {slide.details.label}
+                {lang === 'en'
+                  ? slide.details.label
+                  : slide.details.label === 'Healthy'
+                    ? 'Malusog ang Puno'
+                    : slide.details.label === 'Mild'
+                      ? 'Bahagya ang Lala'
+                      : slide.details.label === 'Moderate'
+                        ? 'Katamtaman ang Lala'
+                        : 'Malala na ang Puno'}
               </Text>
               <Text style={styles.severityDescription}>
                 {lang === 'en' 
                   ? 'Percent Severity Index measures the extent of disease on your mango leaves'
-                  : 'Ang PSI ay sumusukat sa lawak ng sakit sa mga dahon ng mangga'
+                  : 'Sinusukat ng PSI kung gaano kalala ang sakit sa mga dahon ng mangga mo'
                 }
               </Text>
             </View>
@@ -379,7 +387,9 @@ export default function SummaryScreen() {
 
             <View style={[styles.riskBadge, { backgroundColor: slide.color + '15' }]}>
               <Text style={[styles.riskText, { color: slide.color }]}>
-                {slide.details.risk} {lang === 'en' ? 'Weather Risk' : 'Panganib sa Panahon'}
+                {lang === 'en'
+                  ? `${slide.details.risk} Weather Risk`
+                  : `${slide.details.risk === 'Low' ? 'Mahina' : slide.details.risk === 'Medium' ? 'Katamtaman' : 'Malala'} na Banta ng Panahon`}
               </Text>
             </View>
           </View>
@@ -395,11 +405,20 @@ export default function SummaryScreen() {
                   <Ionicons name="medical" size={28} color={severityColor} />
                 </View>
                 <Text style={styles.riskSectionTitle}>
-                  {lang === 'en' ? 'Disease Severity' : 'Kalubhaan ng Sakit'}
+                  {lang === 'en' ? 'Disease Severity' : 'Lala ng Sakit'}
                 </Text>
                 <Text style={[styles.riskSectionValue, { color: severityColor }]}>
-                  {slide.details.severity}
+                  {lang === 'en'
+                    ? slide.details.severity
+                    : slide.details.severity === 'Healthy'
+                      ? 'Malusog'
+                      : slide.details.severity === 'Mild'
+                        ? 'Bahagya'
+                        : slide.details.severity === 'Moderate'
+                          ? 'Katamtaman'
+                          : 'Malala'}
                 </Text>
+
               </View>
 
               {/* Plus Icon */}
@@ -413,10 +432,16 @@ export default function SummaryScreen() {
                   <Ionicons name="cloud-outline" size={28} color={getWeatherRiskColor(slide.details.weatherRisk)} />
                 </View>
                 <Text style={styles.riskSectionTitle}>
-                  {lang === 'en' ? 'Spread Risk' : 'Panganib ng Pagkalat'}
+                  {lang === 'en' ? 'Spread Risk' : 'Lakas ng Pagkalat'}
                 </Text>
                 <Text style={[styles.riskSectionValue, { color: getWeatherRiskColor(slide.details.weatherRisk) }]}>
-                  {slide.details.weatherRisk}
+                  {lang === 'en'
+                    ? slide.details.weatherRisk
+                    : slide.details.weatherRisk === 'Low'
+                      ? 'Mahina'
+                      : slide.details.weatherRisk === 'Medium'
+                        ? 'Katamtaman'
+                        : 'Malala'}
                 </Text>
               </View>
             </View>
@@ -425,14 +450,29 @@ export default function SummaryScreen() {
             <View style={[styles.combinedResultBadge, { backgroundColor: slide.color + '15' }]}>
               <Ionicons name="analytics" size={24} color={slide.color} />
               <Text style={[styles.combinedResultText, { color: slide.color }]}>
-                {slide.details.combined}
+                {lang === 'en'
+                  ? slide.details.combined
+                  : `${slide.details.severity === 'Healthy'
+                      ? 'Malusog'
+                      : slide.details.severity === 'Mild'
+                        ? 'Bahagya'
+                        : slide.details.severity === 'Moderate'
+                          ? 'Katamtaman'
+                          : 'Malala'} + ${
+                      slide.details.weatherRisk === 'Low'
+                        ? 'Mahina'
+                        : slide.details.weatherRisk === 'Medium'
+                          ? 'Katamtaman'
+                          : 'Malala'}`
+                }
               </Text>
+
             </View>
 
             <Text style={styles.combinedDescription}>
               {lang === 'en' 
                 ? 'This combination determines the urgency and type of treatment needed for your mango tree.'
-                : 'Ang kombinasyong ito ay tumutukoy sa kadalian at uri ng paggamot na kailangan para sa inyong puno ng mangga.'
+                : 'Itong kombinasyon ang nagsasabi kung gaano kaagad at anong lunas ang bagay sa puno ng mangga mo.'
               }
             </Text>
           </View>
@@ -451,7 +491,7 @@ export default function SummaryScreen() {
             <Text style={styles.actionDescription}>
               {lang === 'en' 
                 ? 'Based on the analysis, this is the recommended course of action for your mango tree.'
-                : 'Batay sa pagsusuri, ito ang inirerekomendang hakbang para sa inyong puno ng mangga.'
+                : 'Ayon sa pagsusuri, ito ang dapat gawin para sa puno ng mangga mo.'
               }
             </Text>
           </View>
@@ -461,24 +501,41 @@ export default function SummaryScreen() {
         return (
           <View style={styles.slideDetails}>
             <View style={styles.summaryGrid}>
+              {/* Severity */}
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>
-                  {lang === 'en' ? 'Severity' : 'Kalubhaan'}
+                  {lang === 'en' ? 'Severity' : 'Gaano Kalala'}
                 </Text>
                 <Text style={[styles.summaryValue, { color: severityColor }]}>
-                  {overallLabel}
+                  {lang === 'en'
+                    ? overallLabel
+                    : overallLabel === 'Healthy'
+                      ? 'Malusog ang Puno'
+                      : overallLabel === 'Mild'
+                        ? 'Bahagya ang Lala'
+                        : overallLabel === 'Moderate'
+                          ? 'Katamtaman ang Lala'
+                          : 'Malala na ang Puno'}
                 </Text>
               </View>
 
+              {/* Spread Risk */}
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>
-                  {lang === 'en' ? 'Spread Risk' : 'Panganib ng Pagkalat'}
+                  {lang === 'en' ? 'Spread Risk' : 'Lakas ng Pagkalat'}
                 </Text>
                 <Text style={[styles.summaryValue, { color: getWeatherRiskColor(parsedRec?.weather_risk) }]}>
-                  {parsedRec?.weather_risk}
+                  {lang === 'en'
+                    ? parsedRec?.weather_risk
+                    : parsedRec?.weather_risk === 'Low'
+                      ? 'Mahina'
+                      : parsedRec?.weather_risk === 'Medium'
+                        ? 'Katamtaman'
+                        : 'Malala'}
                 </Text>
               </View>
 
+              {/* Action */}
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>
                   {lang === 'en' ? 'Action' : 'Aksyon'}
@@ -489,6 +546,7 @@ export default function SummaryScreen() {
               </View>
             </View>
 
+            {/* Analysis Complete Indicator */}
             <View style={styles.readyIndicator}>
               <Ionicons name="checkmark-done-circle" size={48} color={theme.colors.accent} />
               <Text style={styles.readyText}>
@@ -497,6 +555,7 @@ export default function SummaryScreen() {
             </View>
           </View>
         );
+
 
       default:
         return null;
@@ -535,7 +594,7 @@ export default function SummaryScreen() {
         <Text style={styles.headerSubtitle}>
           {lang === 'en' 
             ? 'Review your mango tree health analysis' 
-            : 'Suriin ang resulta ng inyong puno ng mangga'
+            : 'Alamin ang kalagayan ng puno mo'
           }
         </Text>
         
@@ -633,7 +692,7 @@ export default function SummaryScreen() {
             end={{ x: 1, y: 1 }}
           >
             <Text style={styles.continueButtonText}>
-              {lang === 'en' ? 'View Detailed Results' : 'Tingnan ang Detalyadong Resulta'}
+              {lang === 'en' ? 'View Detailed Results' : 'Tingnan ang Buong Resulta'}
             </Text>
             <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
           </LinearGradient>

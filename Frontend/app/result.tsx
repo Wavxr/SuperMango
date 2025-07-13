@@ -83,15 +83,15 @@ export default function ResultScreen() {
 
   // Tagalog mappings
   const TAGALOG_SEVERITY: Record<string, string> = {
-    Healthy: 'Malusog',
-    Mild: 'Bahagya',
-    Moderate: 'Katamtaman',
-    Severe: 'Malala',
+    Healthy: 'Malusog ang Puno',
+    Mild: 'Bahagya ang Lala',
+    Moderate: 'Katamtaman ang Lala',
+    Severe: 'Malala na ang Puno',
   };
   const TAGALOG_RISK: Record<string, string> = {
-    Low: 'Mababang',
-    Medium: 'Katamtamang',
-    High: 'Mataas na',
+    Low: 'Mahina ang',
+    Medium: 'Katamtamang ang',
+    High: 'Malakas ang',
   };
 
   const displaySeverity =
@@ -288,7 +288,7 @@ export default function ResultScreen() {
                         <Ionicons name="leaf" size={22} color={severityColor} />
                       </View>
                       <Text style={styles.cardTitle}>
-                        {lang === 'tl' ? 'Kalubhaan' : 'Severity'}
+                        {lang === 'tl' ? 'Lubha' : 'Severity'}
                       </Text>
                     </View>
                     <View style={[styles.riskContent, styles.cardCenterContent]}>
@@ -336,7 +336,7 @@ export default function ResultScreen() {
                         />
                       </View>
                       <Text style={styles.cardTitle}>
-                        {lang === 'tl' ? 'Panganib' : 'Risk'}
+                        {lang === 'tl' ? 'Pagkalat' : 'Risk'}
                       </Text>
                     </View>
 
@@ -354,7 +354,7 @@ export default function ResultScreen() {
                           },
                           lang === 'tl' && { fontSize: 14 },
                         ]}>
-                        {displayRisk} {lang === 'tl' ? 'Panganib' : 'Risk'}
+                        {displayRisk} {lang === 'tl' ? 'Pagkalat' : 'Risk'}
                       </Text>
                       <Text style={styles.actionText}>
                         {lang === 'tl' ? 'Gagawin:' : 'Action:'}

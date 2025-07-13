@@ -22,7 +22,7 @@ import {
       title: { en: "Clean Lens", tl: "Linisin ang Kamera" },
       description: {
         en: "Wipe your camera lens for a crystal clear photo.",
-        tl: "Punasan ang lente ng kamera para malinaw ang kuha.",
+        tl: "Punasan ang lente ng camera para luminaw ang kuha.",
       },
     },
     {
@@ -30,7 +30,7 @@ import {
       title: { en: "One Leaf Only", tl: "Isang Dahon Lamang" },
       description: {
         en: "Show only one full leaf in the photo frame.",
-        tl: "Siguraduhing isang buong dahon lang ang nasa larawan.",
+        tl: "Isang buong dahon lang ang kuhanan ng litrato.",
       },
     },
     {
@@ -38,7 +38,7 @@ import {
       title: { en: "Good Lighting", tl: "Maliwanag na Ilaw" },
       description: {
         en: "Take photo during daylight, from above the leaf.",
-        tl: "Kuhanan sa umaga mula sa itaas ng dahon.",
+        tl: "Kuhanan ng litrato sa maliwanag na lugar.",
       },
     },
   ];
@@ -339,7 +339,13 @@ import {
                     {/* Content */}
                     <View style={styles.contentContainer}>
                       <Text style={styles.stepNumber}>
-                        {lang === "en" ? `Step ${idx + 1}` : `Hakbang ${idx + 1}`}
+                        {lang === "en"
+                          ? `Step ${idx + 1}`
+                          : idx === 0
+                            ? "Unang Hakbang"
+                            : idx === 1
+                              ? "Pangalawang Hakbang"
+                              : "Ikatlong Hakbang"}
                       </Text>
                       <Text style={styles.title}>
                         {item.title[lang]}
